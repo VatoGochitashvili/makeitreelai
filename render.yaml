@@ -1,0 +1,13 @@
+# Render blueprint — deploys the whole app (frontend + API + ffmpeg/yt-dlp).
+# In Render: New → Blueprint → connect this repo. Then set OPENAI_API_KEY.
+services:
+  - type: web
+    name: makeitreelai
+    runtime: docker
+    plan: free           # free tier sleeps when idle & has ephemeral disk
+    healthCheckPath: /
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false        # you paste this in the Render dashboard (never committed)
+      - key: SESSION_SECRET
+        generateValue: true  # keeps logins valid across restarts
