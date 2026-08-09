@@ -49,6 +49,20 @@ function probeDurationSec(file) {
   });
 }
 
+// Some ffmpeg builds ship without libfreetype (no `drawtext` filter). Detect
+// once so we can burn captions when possible and skip them gracefully if not.
+let _drawtext;
+function hasDrawtext() {
+  if (_drawtext !== undefined) return Promise.resolve(_drawtext);
+  return new Promise((resolve) => {
+    const p = spawn("ffmpeg", ["-hide_banner", "-filters"]);
+    let out = "";
+    p.stdout.on("data", (d) => (out += d.toString()));
+    p.on("error", () => resolve((_drawtext = false)));
+    p.on("close", () => resolve((_drawtext = /\bdrawtext\b/.test(out))));
+  });
+}
+
 // Whisper rejects uploads over 25MB; stay safely under it.
 const WHISPER_LIMIT_BYTES = 24 * 1024 * 1024;
 // At 64kbps mono a 15-min chunk is ~7MB — comfortably under the limit.
@@ -172,13 +186,20 @@ async function cutClip(videoPath, clip, index, workDir, resolution, log) {
   // Escape the title for ffmpeg drawtext
   const title = (clip.title || "").replace(/'/g, "’").replace(/:/g, " ").slice(0, 60);
 
-  // Filter: scale up, crop center to 9:16, then draw the title near the top.
+  // Filter: scale up, crop center to 9:16, then (if supported) draw the title.
   // Normalize fps/pixfmt/audio so clips can be safely concatenated with an intro.
-  const vf = [
-    `scale=${W}:-2`,
-    `crop=${W}:${H}:(iw-${W})/2:(ih-${H})/2`,
-    `drawtext=text='${title}':fontcolor=white:fontsize=${fontsize}:box=1:boxcolor=black@0.5:boxborderw=18:x=(w-text_w)/2:y=${Math.round(H * 0.073)}:line_spacing=8`,
-  ].join(",");
+  // Scale to COVER the 9:16 frame (works for landscape or portrait sources),
+  // then center-crop. Scaling only the width broke on landscape videos.
+  const filters = [
+    `scale=${W}:${H}:force_original_aspect_ratio=increase`,
+    `crop=${W}:${H}`,
+  ];
+  if (await hasDrawtext()) {
+    filters.push(`drawtext=text='${title}':fontcolor=white:fontsize=${fontsize}:box=1:boxcolor=black@0.5:boxborderw=18:x=(w-text_w)/2:y=${Math.round(H * 0.073)}:line_spacing=8`);
+  } else if (index === 0) {
+    log("Note: this ffmpeg build has no 'drawtext' filter — clips will render without burned-in captions.");
+  }
+  const vf = filters.join(",");
 
   log(`Cutting clip ${index + 1} @${H}p: "${clip.title || "untitled"}"…`);
   await run("ffmpeg", [
@@ -225,16 +246,21 @@ async function addNarratedIntro(baseClip, clip, index, workDir, resolution, voic
   const fontsize = Math.round(W / 15);
 
   const intro = path.join(workDir, `intro_${index + 1}.mp4`);
-  await run("ffmpeg", [
+  const introArgs = [
     "-y",
     "-f", "lavfi", "-i", `color=c=0x0b1020:s=${W}x${H}:d=${dur}`,
     "-i", voMp3,
-    "-vf", `drawtext=text='${wrapped}':fontcolor=white:fontsize=${fontsize}:x=(w-text_w)/2:y=(h-text_h)/2:line_spacing=14`,
+  ];
+  if (await hasDrawtext()) {
+    introArgs.push("-vf", `drawtext=text='${wrapped}':fontcolor=white:fontsize=${fontsize}:x=(w-text_w)/2:y=(h-text_h)/2:line_spacing=14`);
+  }
+  introArgs.push(
     "-r", "30", "-pix_fmt", "yuv420p",
     "-c:v", "libx264", "-preset", "veryfast",
     "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
     "-shortest", intro,
-  ]);
+  );
+  await run("ffmpeg", introArgs);
 
   // Concat (re-encode) intro + clip into the final narrated short.
   const final = path.join(workDir, `final_${index + 1}.mp4`);
