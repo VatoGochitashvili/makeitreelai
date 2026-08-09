@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Account — MakeItReel</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<nav class="site">
+  <div class="wrap">
+    <a class="logo" href="/">
+      <svg class="logo-mark" viewBox="0 0 52 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="mp" x1="10" y1="6" x2="42" y2="44" gradientUnits="userSpaceOnUse"><stop stop-color="#ff2d78"/><stop offset=".5" stop-color="#9b2fd0"/><stop offset="1" stop-color="#2b6fe6"/></linearGradient>
+          <linearGradient id="mf" x1="24" y1="10" x2="40" y2="44" gradientUnits="userSpaceOnUse"><stop stop-color="#5b8cff"/><stop offset="1" stop-color="#2b46c9"/></linearGradient>
+        </defs>
+        <path d="M30 8C42 12 46 26 40 38C46 24 40 12 30 8Z" fill="url(#mf)"/>
+        <path d="M33 11c9 4 12 16 6 26l-3-1c5-9 3-19-5-23Z" fill="url(#mf)"/>
+        <g fill="#cdd6ff"><rect x="35.5" y="15" width="2.2" height="2.2" rx=".5"/><rect x="38" y="20" width="2.2" height="2.2" rx=".5"/><rect x="38.6" y="26" width="2.2" height="2.2" rx=".5"/><rect x="37" y="32" width="2.2" height="2.2" rx=".5"/></g>
+        <path d="M12 12.6c0-2.5 2.7-4 4.8-2.8l21.6 12.3c2.1 1.2 2.1 4.3 0 5.5L16.8 39.9C14.7 41.1 12 39.6 12 37.1V12.6Z" fill="url(#mp)"/>
+        <g fill="#e5297f"><rect x="39" y="3.5" width="4.5" height="4.5" rx="1"/><rect x="45.5" y="8" width="3.2" height="3.2" rx="1" fill="#c72fae"/><rect x="35" y="0.5" width="3" height="3" rx="1"/></g>
+      </svg>
+      <span class="wm"><span class="wm-make">Makeit</span><span class="wm-reel">Reel</span></span>
+    </a>
+    <div class="nav-links"><a href="/">Home</a><a href="/#try">Generate</a><a href="/#pricing">Pricing</a></div>
+    <div class="nav-right" id="navRight">
+      <a class="btn ghost" href="/login.html">Log in</a>
+      <a class="btn" href="/register.html">Sign up free</a>
+    </div>
+  </div>
+</nav>
+
+<main class="wrap dash" id="dash" style="display:none">
+  <header class="dash-head">
+    <div>
+      <h1 id="hi">Your account</h1>
+      <p class="muted" id="subhi">Manage your plan, billing and settings.</p>
+    </div>
+    <button class="btn ghost" id="logout2">Log out</button>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="overview">Overview</button>
+    <button class="tab" data-tab="scheduler">Scheduler</button>
+    <button class="tab" data-tab="billing">Plan &amp; Billing</button>
+    <button class="tab" data-tab="settings">Settings</button>
+  </div>
+
+  <!-- OVERVIEW -->
+  <section class="tab-pane active" id="tab-overview">
+    <div class="dash-grid">
+      <div class="card usage-card">
+        <div class="card-h">Current plan</div>
+        <div class="plan-now"><span class="plan-badge" id="planBadge">—</span><span class="plan-price" id="planPrice"></span></div>
+        <div class="usage">
+          <div class="usage-row"><span>Videos this month</span><strong id="uVideos">—</strong></div>
+          <div class="bar"><div class="bar-fill" id="uBar"></div></div>
+          <div class="usage-row"><span>Clips per video</span><strong id="uClips">—</strong></div>
+          <div class="usage-row"><span>Export quality</span><strong id="uRes">—</strong></div>
+        </div>
+        <a class="btn block" href="/#try">Generate clips →</a>
+      </div>
+
+      <div class="card">
+        <div class="card-h">What's included</div>
+        <ul class="feat-list" id="featList"></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- SCHEDULER -->
+  <section class="tab-pane" id="tab-scheduler">
+    <div id="schedLocked" class="card" style="display:none;text-align:center">
+      <div class="card-h">Auto-post scheduler</div>
+      <p class="muted" style="margin-bottom:18px">📅 Queue your clips to TikTok, Instagram &amp; YouTube — post on autopilot. This is a <strong>Creator/Pro</strong> feature.</p>
+      <button class="btn switch-plan" data-plan="creator">Upgrade to Creator</button>
+    </div>
+    <div id="schedMain" style="display:none">
+      <div class="note-banner">📅 Link your accounts, then queue clips to post automatically. Real publishing uses each platform's API — for now, connections are simulated and scheduled posts flip to “posted” at their due time.</div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-h">Connected accounts</div>
+        <div class="conn-row" id="connRow"></div>
+      </div>
+      <div class="dash-grid">
+        <div class="card">
+          <div class="card-h">Schedule a post</div>
+          <form id="schedForm">
+            <div class="field"><label for="scClip">Clip URL</label><input id="scClip" type="text" placeholder="/clips/…/clip_1.mp4 or a link"></div>
+            <div class="field"><label for="scTitle">Caption / title</label><input id="scTitle" type="text" placeholder="e.g. The $0 to $1M mindset shift"></div>
+            <div class="field"><label for="scPlatform">Platform</label>
+              <select id="scPlatform" class="voice-select" style="width:100%">
+                <option value="tiktok">TikTok</option>
+                <option value="instagram">Instagram Reels</option>
+                <option value="youtube">YouTube Shorts</option>
+              </select>
+            </div>
+            <div class="field"><label for="scWhen">When</label><input id="scWhen" type="datetime-local"></div>
+            <div class="auth-msg" id="schedMsg"></div>
+            <button class="btn block" type="submit">📅 Schedule post</button>
+          </form>
+        </div>
+        <div class="card">
+          <div class="card-h">Queue</div>
+          <div id="schedList" class="sched-list"><p class="muted">No scheduled posts yet.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PLAN & BILLING -->
+  <section class="tab-pane" id="tab-billing">
+    <div class="note-banner">💳 Payments aren't live yet — switching plans here changes your features immediately at no charge, for testing. Stripe checkout comes later.</div>
+    <div class="plans" id="planCards"></div>
+
+    <div class="dash-grid" style="margin-top:26px">
+      <div class="card">
+        <div class="card-h">Payment method</div>
+        <p class="muted">No payment method on file.</p>
+        <button class="btn ghost" disabled>Add payment method — coming soon</button>
+      </div>
+      <div class="card">
+        <div class="card-h">Billing history</div>
+        <p class="muted">No invoices yet. Paid plans will show receipts here.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="tab-pane" id="tab-settings">
+    <div class="dash-grid">
+      <div class="card">
+        <div class="card-h">Profile</div>
+        <form id="profileForm">
+          <div class="field"><label for="setName">Name</label><input id="setName" type="text"></div>
+          <div class="field"><label>Email</label><input id="setEmail" type="email" disabled></div>
+          <div class="auth-msg" id="profileMsg"></div>
+          <button class="btn" type="submit">Save changes</button>
+        </form>
+      </div>
+      <div class="card">
+        <div class="card-h">Password</div>
+        <form id="pwForm">
+          <div class="field"><label for="pwCur">Current password</label><input id="pwCur" type="password" autocomplete="current-password"></div>
+          <div class="field"><label for="pwNew">New password</label><input id="pwNew" type="password" autocomplete="new-password" minlength="8"></div>
+          <div class="auth-msg" id="pwMsg"></div>
+          <button class="btn" type="submit">Update password</button>
+        </form>
+      </div>
+    </div>
+    <div class="card danger">
+      <div class="card-h">Danger zone</div>
+      <p class="muted">Permanently delete your account and all associated data. This cannot be undone.</p>
+      <button class="btn danger-btn" id="deleteBtn">Delete my account</button>
+    </div>
+  </section>
+</main>
+
+<!-- shown if not logged in -->
+<div class="auth-wrap" id="needLogin" style="display:none">
+  <div class="auth-card" style="text-align:center">
+    <h1>Please log in</h1>
+    <p class="sub">You need an account to view this page.</p>
+    <a class="btn block lg" href="/login.html">Log in</a>
+    <div class="auth-alt">No account? <a href="/register.html">Sign up free</a></div>
+  </div>
+</div>
+
+<script src="/auth-ui.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const PLAN_META = {
+  free:    { name: "Free",    price: "$0/mo",  clips: 3,  res: 720 },
+  creator: { name: "Creator", price: "$19/mo", clips: 10, res: 1080 },
+  pro:     { name: "Pro",     price: "$49/mo", clips: 10, res: 1080 },
+};
+const FEATURES = [
+  { key: "captions",     label: "Auto captions" },
+  { key: "voiceover",    label: "AI voiceover (narrated hook intro)" },
+  { key: "scheduler",    label: "Auto-post scheduler" },
+  { key: "faceTracking", label: "Face-tracking reframe" },
+];
+let ME = null;
+
+async function load() {
+  const r = await fetch("/api/me");
+  ME = await r.json();
+  if (!ME.user) { $("dash").style.display = "none"; $("needLogin").style.display = "grid"; return; }
+  $("dash").style.display = "block";
+  render();
+
+  // Open a specific tab from the URL hash (e.g. /account.html#scheduler).
+  const hash = location.hash.replace("#", "");
+  if (hash) {
+    const tab = document.querySelector(`.tab[data-tab="${hash}"]`);
+    if (tab) tab.click();
+  }
+}
+
+function render() {
+  const { user, plan, usage } = ME;
+  $("hi").textContent = "Hey, " + (user.name || "there") + " 👋";
+  $("subhi").textContent = user.email;
+
+  $("planBadge").textContent = plan.name;
+  $("planPrice").textContent = PLAN_META[plan.key].price;
+
+  const unlimited = usage.videosPerMonth === -1;
+  $("uVideos").textContent = unlimited ? `${usage.videos} used · Unlimited` : `${usage.videos} / ${usage.videosPerMonth}`;
+  $("uBar").style.width = unlimited ? "18%" : Math.min(100, (usage.videos / usage.videosPerMonth) * 100) + "%";
+  $("uClips").textContent = plan.clipsPerVideo + " clips";
+  $("uRes").textContent = plan.resolution + "p";
+
+  $("featList").innerHTML = FEATURES.map((f) =>
+    `<li class="${plan[f.key] ? "on" : "off"}">${plan[f.key] ? "✓" : "🔒"} ${f.label}</li>`).join("");
+
+  $("setName").value = user.name || "";
+  $("setEmail").value = user.email || "";
+
+  renderPlanCards();
+  setupScheduler();
+}
+
+// ---------- scheduler ----------
+const PLATFORM_META = {
+  tiktok: { label: "TikTok", icon: "🎵" },
+  instagram: { label: "Instagram Reels", icon: "📸" },
+  youtube: { label: "YouTube Shorts", icon: "▶️" },
+};
+
+function setupScheduler() {
+  const can = !!(ME.plan && ME.plan.scheduler);
+  $("schedLocked").style.display = can ? "none" : "block";
+  $("schedMain").style.display = can ? "block" : "none";
+  if (!can) return;
+
+  // Prefill from a "Schedule" click on a finished clip.
+  try {
+    const pre = JSON.parse(localStorage.getItem("mir_scheduleClip") || "null");
+    if (pre) {
+      $("scClip").value = pre.url || "";
+      $("scTitle").value = pre.title || "";
+      localStorage.removeItem("mir_scheduleClip");
+    }
+  } catch (_) {}
+
+  // Default the time to ~1 hour from now.
+  if (!$("scWhen").value) {
+    const d = new Date(Date.now() + 60 * 60 * 1000);
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    $("scWhen").value = d.toISOString().slice(0, 16);
+  }
+  renderConnections();
+  loadSchedule();
+}
+
+function renderConnections() {
+  const conns = ME.connections || {};
+  $("connRow").innerHTML = Object.keys(PLATFORM_META).map((p) => {
+    const m = PLATFORM_META[p];
+    const c = conns[p];
+    return `<div class="conn-card">
+      <div class="conn-ic">${m.icon}</div>
+      <div class="conn-name">${m.label}</div>
+      <div class="conn-state">${c ? `<span class="conn-on">● ${c.handle}</span>` : `<span class="conn-off">Not connected</span>`}</div>
+      ${c
+        ? `<button class="btn ghost conn-btn" data-disc="${p}">Disconnect</button>`
+        : `<button class="btn conn-btn" data-conn="${p}">Connect</button>`}
+    </div>`;
+  }).join("");
+  $("connRow").querySelectorAll("[data-conn]").forEach((b) => b.addEventListener("click", async () => {
+    const r = await fetch("/api/connect/" + b.dataset.conn, { method: "POST" });
+    if (r.ok) { ME.connections = (await r.json()).connections; renderConnections(); }
+  }));
+  $("connRow").querySelectorAll("[data-disc]").forEach((b) => b.addEventListener("click", async () => {
+    const r = await fetch("/api/connect/" + b.dataset.disc, { method: "DELETE" });
+    if (r.ok) { ME.connections = (await r.json()).connections; renderConnections(); }
+  }));
+}
+
+async function loadSchedule() {
+  const r = await fetch("/api/schedule");
+  if (!r.ok) return;
+  const { posts } = await r.json();
+  const list = $("schedList");
+  if (!posts.length) { list.innerHTML = '<p class="muted">No scheduled posts yet.</p>'; return; }
+  list.innerHTML = posts.map((p) => {
+    const m = PLATFORM_META[p.platform] || { label: p.platform, icon: "📱" };
+    const when = new Date(p.when).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+    const posted = p.status === "posted";
+    return `<div class="sched-item">
+      <div class="sched-plat">${m.icon}</div>
+      <div class="sched-body">
+        <div class="sched-title">${p.title}</div>
+        <div class="sched-meta">${m.label} · ${when}</div>
+      </div>
+      <span class="sched-status ${posted ? "posted" : ""}">${posted ? "✓ Posted" : "Scheduled"}</span>
+      <button class="sched-x" data-id="${p.id}" title="Cancel">✕</button>
+    </div>`;
+  }).join("");
+  list.querySelectorAll(".sched-x").forEach((b) => b.addEventListener("click", async () => {
+    await fetch("/api/schedule/" + b.dataset.id, { method: "DELETE" });
+    loadSchedule();
+  }));
+}
+
+document.getElementById("schedForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const msg = $("schedMsg"); msg.className = "auth-msg";
+  const body = {
+    clipUrl: $("scClip").value.trim(),
+    title: $("scTitle").value.trim(),
+    platform: $("scPlatform").value,
+    when: $("scWhen").value,
+  };
+  const r = await fetch("/api/schedule", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const d = await r.json();
+  if (r.ok) { msg.className = "auth-msg ok"; msg.textContent = "Scheduled!"; $("scClip").value = ""; $("scTitle").value = ""; loadSchedule(); }
+  else { msg.className = "auth-msg err"; msg.textContent = d.error || "Failed"; }
+});
+
+function renderPlanCards() {
+  const cur = ME.plan.key;
+  const order = ["free", "creator", "pro"];
+  $("planCards").innerHTML = order.map((k) => {
+    const m = PLAN_META[k];
+    const isCur = k === cur;
+    const feats = {
+      free: ["3 clips / video", "2 videos / month", "720p exports"],
+      creator: ["10 clips / video", "Unlimited videos", "1080p exports", "AI voiceover", "Auto-post scheduler"],
+      pro: ["Everything in Creator", "Face-tracking reframe", "3 workspaces", "Priority rendering"],
+    }[k];
+    return `<div class="plan ${k === "creator" ? "pop" : ""}">
+      ${k === "creator" ? '<div class="badge">Most popular</div>' : ""}
+      <div class="pname">${m.name}</div>
+      <div class="price">${m.price.split("/")[0]}<span>/mo</span></div>
+      <ul>${feats.map((f) => `<li>${f}</li>`).join("")}</ul>
+      ${isCur
+        ? `<button class="btn ghost block" disabled>Current plan</button>`
+        : `<button class="btn block switch-plan" data-plan="${k}">Switch to ${m.name}</button>`}
+    </div>`;
+  }).join("");
+  document.querySelectorAll(".switch-plan").forEach((b) =>
+    b.addEventListener("click", () => switchPlan(b.dataset.plan)));
+}
+
+async function switchPlan(plan) {
+  const r = await fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan }) });
+  if (r.ok) load(); // re-render with new plan
+}
+
+// tabs
+document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => {
+  document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
+  document.querySelectorAll(".tab-pane").forEach((x) => x.classList.remove("active"));
+  t.classList.add("active");
+  $("tab-" + t.dataset.tab).classList.add("active");
+}));
+
+// profile
+$("profileForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const msg = $("profileMsg"); msg.className = "auth-msg";
+  const r = await fetch("/api/account", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: $("setName").value.trim() }) });
+  const d = await r.json();
+  if (r.ok) { msg.className = "auth-msg ok"; msg.textContent = "Saved!"; load(); }
+  else { msg.className = "auth-msg err"; msg.textContent = d.error || "Failed"; }
+});
+
+// password
+$("pwForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const msg = $("pwMsg"); msg.className = "auth-msg";
+  const r = await fetch("/api/password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ current: $("pwCur").value, next: $("pwNew").value }) });
+  const d = await r.json();
+  if (r.ok) { msg.className = "auth-msg ok"; msg.textContent = "Password updated!"; $("pwCur").value = ""; $("pwNew").value = ""; }
+  else { msg.className = "auth-msg err"; msg.textContent = d.error || "Failed"; }
+});
+
+// delete
+$("deleteBtn").addEventListener("click", async () => {
+  if (!confirm("Delete your account permanently? This cannot be undone.")) return;
+  const r = await fetch("/api/account", { method: "DELETE" });
+  if (r.ok) location.href = "/";
+});
+
+$("logout2").addEventListener("click", async () => { await fetch("/api/logout", { method: "POST" }); location.href = "/"; });
+
+load();
+</script>
+</body>
+</html>

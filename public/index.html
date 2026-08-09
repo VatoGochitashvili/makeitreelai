@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MakeItReel — Turn any video into viral clips</title>
+<meta name="description" content="Paste one podcast or YouTube link and get several ready-to-post vertical clips. Built for podcasters and creators.">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<nav class="site">
+  <div class="wrap">
+    <a class="logo" href="/">
+      <svg class="logo-mark" viewBox="0 0 52 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="mp" x1="10" y1="6" x2="42" y2="44" gradientUnits="userSpaceOnUse"><stop stop-color="#ff2d78"/><stop offset=".5" stop-color="#9b2fd0"/><stop offset="1" stop-color="#2b6fe6"/></linearGradient>
+          <linearGradient id="mf" x1="24" y1="10" x2="40" y2="44" gradientUnits="userSpaceOnUse"><stop stop-color="#5b8cff"/><stop offset="1" stop-color="#2b46c9"/></linearGradient>
+        </defs>
+        <path d="M30 8C42 12 46 26 40 38C46 24 40 12 30 8Z" fill="url(#mf)"/>
+        <path d="M33 11c9 4 12 16 6 26l-3-1c5-9 3-19-5-23Z" fill="url(#mf)"/>
+        <g fill="#cdd6ff"><rect x="35.5" y="15" width="2.2" height="2.2" rx=".5"/><rect x="38" y="20" width="2.2" height="2.2" rx=".5"/><rect x="38.6" y="26" width="2.2" height="2.2" rx=".5"/><rect x="37" y="32" width="2.2" height="2.2" rx=".5"/></g>
+        <path d="M12 12.6c0-2.5 2.7-4 4.8-2.8l21.6 12.3c2.1 1.2 2.1 4.3 0 5.5L16.8 39.9C14.7 41.1 12 39.6 12 37.1V12.6Z" fill="url(#mp)"/>
+        <g fill="#e5297f"><rect x="39" y="3.5" width="4.5" height="4.5" rx="1"/><rect x="45.5" y="8" width="3.2" height="3.2" rx="1" fill="#c72fae"/><rect x="35" y="0.5" width="3" height="3" rx="1"/></g>
+      </svg>
+      <span class="wm"><span class="wm-make">Makeit</span><span class="wm-reel">Reel</span></span>
+    </a>
+    <div class="nav-links">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <div class="nav-right" id="navRight">
+      <!-- filled by auth-ui.js: either Login/Sign up, or account pill -->
+      <a class="btn ghost" href="/login.html">Log in</a>
+      <a class="btn" href="/register.html">Sign up free</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-copy">
+      <span class="eyebrow"><span class="dot"></span> Built for podcasters &amp; creators</span>
+      <h1>One link.<br><span class="grad">Ten viral reels.</span></h1>
+      <p class="sub">Paste a YouTube or podcast link. Our AI finds the best moments and cuts them into ready-to-post vertical clips — with captions, in minutes.</p>
+      <form class="hero-bar" id="heroBar">
+        <span class="hero-bar-ic">🔗</span>
+        <input id="heroUrl" type="text" placeholder="Paste your YouTube or podcast link…" autocomplete="off" />
+        <button class="btn lg" type="submit">Get my clips →</button>
+      </form>
+      <div class="hero-bar-sub">✨ Free to start — no credit card needed</div>
+      <div class="trust">
+        <span>✨ No editing skills needed</span>
+        <span>⚡ ~2 min per video</span>
+        <span>📅 Auto-post scheduler</span>
+      </div>
+    </div>
+
+    <!-- phone with scrolling reels -->
+    <div class="phone-stage">
+      <div class="chip c1"><span class="k" style="background:var(--lime)"></span> 6 clips ready</div>
+      <div class="chip c2">🔥 Virality 92</div>
+      <div class="chip c3"><span class="k" style="background:var(--cyan)"></span> Auto-captioned</div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="reel-track" id="reelTrack">
+            <!-- set A — blended niches: podcast, car, travel, fitness, food -->
+            <div class="reel g3"><img src="https://images.unsplash.com/photo-1576250671051-8937769d186c?auto=format&fit=crop&w=600&h=1080&q=70" alt="" onerror="this.remove()">
+              <span class="score">🔥 91</span><span class="play"></span>
+              <div class="cap">The <em>$0 to $1M</em> mindset shift</div><div class="handle">@hustlecast</div></div>
+            <div class="reel g5"><img src="https://images.unsplash.com/photo-1521136095380-08fbd7be93c8?auto=format&fit=crop&w=600&h=1080&q=70" alt="" onerror="this.remove()">
+              <span class="score">🔥 90</span><span class="play"></span>
+              <div class="cap">Is this the <em>best daily</em> under $30K?</div><div class="handle">@carvault</div></div>
+            <div class="reel g5"><img src="https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=600&h=1080&q=70" alt="" onerror="this.remove()">
+              <span class="score">🔥 93</span><span class="play"></span>
+              <div class="cap">The most <em>underrated</em> city in Europe</div><div class="handle">@nomadtales</div></div>
+            <div class="reel g2"><img src="https://images.unsplash.com/photo-1655947717064-d856af599bd1?auto=format&fit=crop&w=600&h=1080&q=70" alt="" onerror="this.remove()">
+              <span class="score">🔥 88</span><span class="play"></span>
+              <div class="cap">Why most people <em>quit</em> too early</div><div class="handle">@foundersdaily</div></div>
+            <div class="reel g6"><img src="https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?auto=format&fit=crop&w=600&h=1080&q=70" alt="" onerror="this.remove()">
+              <span class="score">🔥 87</span><span class="play"></span>
+              <div class="cap">Do this for your first <em>pull-up</em></div><div class="handle">@liftlab</div></div>
+            <div class="reel g6"><img src="https://images.unsplash.com/photo-1556908289-84da46520347?auto=format&fit=crop&w=600&h=1080&q=70" alt="" onerror="this.remove()">
+              <span class="score">🔥 89</span><span class="play"></span>
+              <div class="cap">The only <em>pasta</em> recipe you need</div><div class="handle">@plateddaily</div></div>
+            <div class="reel g7"><img src="https://img.youtube.com/vi/e5Awr7OHJSY/maxresdefault.jpg" alt="" onerror="this.remove()">
+              <span class="score">🔥 95</span><span class="play"></span>
+              <div class="cap">How to solo the <em>wither</em></div><div class="handle">@craftgod</div></div>
+            <div class="reel g8"><img src="https://img.youtube.com/vi/DEeMtqEUstw/maxresdefault.jpg" alt="" onerror="this.remove()">
+              <span class="score">🔥 92</span><span class="play"></span>
+              <div class="cap">The <em>clutch</em> that won the game</div><div class="handle">@fnhighlights</div></div>
+            <!-- set B (duplicate for seamless loop) -->
+            <div class="reel g3"><img src="https://images.unsplash.com/photo-1576250671051-8937769d186c?auto=format&fit=crop&w=600&h=1080&q=70" alt="" onerror="this.remove()">
+              <span class="score">🔥 91</span><span class="play"></span>
+              <div class="cap">The <em>$0 to $1M</em> mindset shift</div><div class="handle">@hustlecast</div></div>
+            <div class="reel g5"><img src="https://images.unsplash.com/photo-1521136095380-08fbd7be93c8?auto=format&fit=crop&w=600&h=1080&q=70" alt="" onerror="this.remove()">
+              <span class="score">🔥 90</span><span class="play"></span>
+              <div class="cap">Is this the <em>best daily</em> under $30K?</div><div class="handle">@carvault</div></div>
+            <div class="reel g5"><img src="https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=600&h=1080&q=70" alt="" onerror="this.remove()">
+              <span class="score">🔥 93</span><span class="play"></span>
+              <div class="cap">The most <em>underrated</em> city in Europe</div><div class="handle">@nomadtales</div></div>
+            <div class="reel g2"><img src="https://images.unsplash.com/photo-1655947717064-d856af599bd1?auto=format&fit=crop&w=600&h=1080&q=70" alt="" onerror="this.remove()">
+              <span class="score">🔥 88</span><span class="play"></span>
+              <div class="cap">Why most people <em>quit</em> too early</div><div class="handle">@foundersdaily</div></div>
+            <div class="reel g6"><img src="https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?auto=format&fit=crop&w=600&h=1080&q=70" alt="" onerror="this.remove()">
+              <span class="score">🔥 87</span><span class="play"></span>
+              <div class="cap">Do this for your first <em>pull-up</em></div><div class="handle">@liftlab</div></div>
+            <div class="reel g6"><img src="https://images.unsplash.com/photo-1556908289-84da46520347?auto=format&fit=crop&w=600&h=1080&q=70" alt="" onerror="this.remove()">
+              <span class="score">🔥 89</span><span class="play"></span>
+              <div class="cap">The only <em>pasta</em> recipe you need</div><div class="handle">@plateddaily</div></div>
+            <div class="reel g7"><img src="https://img.youtube.com/vi/e5Awr7OHJSY/maxresdefault.jpg" alt="" onerror="this.remove()">
+              <span class="score">🔥 95</span><span class="play"></span>
+              <div class="cap">How to solo the <em>wither</em></div><div class="handle">@craftgod</div></div>
+            <div class="reel g8"><img src="https://img.youtube.com/vi/DEeMtqEUstw/maxresdefault.jpg" alt="" onerror="this.remove()">
+              <span class="score">🔥 92</span><span class="play"></span>
+              <div class="cap">The <em>clutch</em> that won the game</div><div class="handle">@fnhighlights</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ TRY IT (the actual tool) ============ -->
+<section class="block" id="try" style="padding-top:30px">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Live demo</span>
+      <h2>Try it with your own link</h2>
+      <p>Paste a video you own. First runs take a couple of minutes while we download, transcribe, and cut.</p>
+    </div>
+    <div class="tool">
+      <!-- shown when logged out -->
+      <div class="login-gate" id="loginGate" style="display:none">
+        <div class="lg-ic">🔒</div>
+        <h3>Log in to generate clips</h3>
+        <p>Create a free account to turn your first video into reels.</p>
+        <div class="cta-row" style="justify-content:center">
+          <a class="btn" href="/register.html">Sign up free</a>
+          <a class="btn ghost" href="/login.html">Log in</a>
+        </div>
+      </div>
+
+      <!-- shown when logged in -->
+      <div id="toolMain" style="display:none">
+        <div class="tool-meta" id="toolMeta"></div>
+        <div class="box">
+          <input id="url" type="text" placeholder="Paste a YouTube or podcast link…" />
+          <button class="btn" id="go">Make my reels</button>
+        </div>
+        <div class="tool-options">
+          <label class="switch" id="voSwitch">
+            <input type="checkbox" id="voToggle">
+            <span class="track"></span>
+            <span class="switch-label">🔊 AI voiceover — narrated hook intro</span>
+          </label>
+          <select id="voVoice" class="voice-select" title="Narration voice">
+            <option value="alloy">Alloy — neutral</option>
+            <option value="nova">Nova — warm</option>
+            <option value="onyx">Onyx — deep</option>
+            <option value="shimmer">Shimmer — bright</option>
+            <option value="echo">Echo — calm</option>
+            <option value="fable">Fable — storyteller</option>
+          </select>
+          <a class="vo-lock" id="voLock" href="/account.html" style="display:none">🔒 Creator feature — upgrade</a>
+        </div>
+        <div class="hint">Only clip videos you own or have rights to. 🔒</div>
+        <div class="panel" id="panel">
+          <div class="status"><span class="spinner" id="spin"></span><span id="statusText">Starting…</span></div>
+          <div class="log" id="log"></div>
+        </div>
+        <div class="clips" id="clips"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SOCIAL PROOF ============ -->
+<section class="block" style="padding:30px 0">
+  <div class="wrap logos">
+    <span>Podcasters</span><span>Coaches</span><span>Faceless channels</span><span>Agencies</span><span>Creators</span>
+  </div>
+</section>
+
+<!-- ============ HOW IT WORKS ============ -->
+<section class="block" id="how">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">How it works</span>
+      <h2>From long video to a week of posts</h2>
+      <p>Three steps. No timeline, no editor, no render queue to babysit.</p>
+    </div>
+    <div class="steps">
+      <div class="step"><div class="n">1</div><h3>Paste a link</h3><p>Drop in a YouTube or podcast URL. We download it and transcribe every word with timestamps.</p></div>
+      <div class="step"><div class="n">2</div><h3>AI picks the gold</h3><p>Our model scans the transcript for hooks, punchlines and quotable moments — and scores each for virality.</p></div>
+      <div class="step"><div class="n">3</div><h3>Get vertical clips</h3><p>Each moment is cut to 9:16, captioned, and ready to download or auto-post to TikTok, Reels & Shorts.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FEATURES ============ -->
+<section class="block" id="features" style="padding-top:20px">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Features</span>
+      <h2>Everything you need to go viral</h2>
+      <p>Built to replace a whole editing workflow — and then some.</p>
+    </div>
+    <div class="features">
+      <div class="feature"><div class="ic">🎯</div><h3>AI moment selection</h3><p>Finds the most clip-worthy 15–60s moments and ranks them by predicted virality.</p></div>
+      <div class="feature"><div class="ic">💬</div><h3>Word-by-word captions</h3><p>Animated, auto-synced captions burned in — the style that stops the scroll.<span class="soon">Coming soon</span></p></div>
+      <div class="feature"><div class="ic">🧑‍🦱</div><h3>Face-tracking reframe</h3><p>The crop follows the active speaker so no one drifts off-frame.<span class="soon">Coming soon</span></p></div>
+      <div class="feature"><div class="ic">📅</div><h3>Auto-post scheduler</h3><p>Queue finished clips straight to TikTok, Instagram & YouTube. Our edge over Opus.<span class="soon">Coming soon</span></p></div>
+      <div class="feature"><div class="ic">📥</div><h3>One-click download</h3><p>Grab every clip as an MP4, ready to post anywhere in seconds.</p></div>
+      <div class="feature"><div class="ic">💸</div><h3>Cost controls</h3><p>Per-plan clip caps keep your bill predictable — no runaway render costs.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PRICING ============ -->
+<section class="block" id="pricing">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Pricing</span>
+      <h2>Simple, creator-friendly plans</h2>
+      <p>Start free. Upgrade when you're ready to post every day.</p>
+    </div>
+    <div class="plans">
+      <div class="plan">
+        <div class="pname">Free</div>
+        <div class="price">$0<span>/mo</span></div>
+        <div class="tag">Kick the tires.</div>
+        <ul>
+          <li>3 clips per video</li>
+          <li>2 videos / month</li>
+          <li>720p exports</li>
+          <li class="off">Auto-post scheduler</li>
+          <li class="off">Face-tracking reframe</li>
+        </ul>
+        <a class="btn ghost block" href="/register.html?plan=free">Get started</a>
+      </div>
+      <div class="plan pop">
+        <div class="badge">Most popular</div>
+        <div class="pname">Creator</div>
+        <div class="price">$19<span>/mo</span></div>
+        <div class="tag">For serious podcasters.</div>
+        <ul>
+          <li>10 clips per video</li>
+          <li>Unlimited videos</li>
+          <li>1080p exports</li>
+          <li>Word-by-word captions</li>
+          <li>Auto-post scheduler</li>
+        </ul>
+        <a class="btn block" href="/register.html?plan=creator">Start free trial</a>
+      </div>
+      <div class="plan">
+        <div class="pname">Pro</div>
+        <div class="price">$49<span>/mo</span></div>
+        <div class="tag">Agencies &amp; teams.</div>
+        <ul>
+          <li>Everything in Creator</li>
+          <li>3 brand workspaces</li>
+          <li>Priority rendering</li>
+          <li>Face-tracking reframe</li>
+          <li>Team seats</li>
+        </ul>
+        <a class="btn ghost block" href="/register.html?plan=pro">Choose Pro</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="block" id="faq">
+  <div class="wrap">
+    <div class="section-head"><span class="eyebrow">FAQ</span><h2>Questions, answered</h2></div>
+    <div class="faq">
+      <details><summary>What kind of videos work best?</summary><p>Talking-head content — podcasts, interviews, coaching, and video essays. Anything with clear speech gives the AI great material to find standout moments.</p></details>
+      <details><summary>Can I clip any YouTube video?</summary><p>Only clip videos you own or have the rights to. We add an ownership check before launch — please respect creators' rights.</p></details>
+      <details><summary>How long does a video take?</summary><p>Most videos finish in a couple of minutes. Longer podcasts take a bit more while we transcribe the full episode in chunks.</p></details>
+      <details><summary>Do you post to socials for me?</summary><p>The auto-post scheduler to TikTok, Instagram and YouTube is on the Creator and Pro plans and rolling out soon.</p></details>
+      <details><summary>Can I cancel anytime?</summary><p>Yes. Plans are monthly and you can cancel from your account at any time — no contracts.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CTA BAND ============ -->
+<section class="block" style="padding-top:10px">
+  <div class="wrap">
+    <div class="cta-band">
+      <h2>Turn your next episode into a week of content</h2>
+      <p>Join the podcasters growing on autopilot with MakeItReel.</p>
+      <a class="btn lg" href="/register.html">Start for free →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="site">
+  <div class="wrap">
+    <a class="logo" href="/" style="font-size:18px">
+      <svg class="logo-mark" viewBox="0 0 52 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M30 8C42 12 46 26 40 38C46 24 40 12 30 8Z" fill="url(#mf)"/>
+        <path d="M33 11c9 4 12 16 6 26l-3-1c5-9 3-19-5-23Z" fill="url(#mf)"/>
+        <g fill="#cdd6ff"><rect x="35.5" y="15" width="2.2" height="2.2" rx=".5"/><rect x="38" y="20" width="2.2" height="2.2" rx=".5"/><rect x="38.6" y="26" width="2.2" height="2.2" rx=".5"/><rect x="37" y="32" width="2.2" height="2.2" rx=".5"/></g>
+        <path d="M12 12.6c0-2.5 2.7-4 4.8-2.8l21.6 12.3c2.1 1.2 2.1 4.3 0 5.5L16.8 39.9C14.7 41.1 12 39.6 12 37.1V12.6Z" fill="url(#mp)"/>
+        <g fill="#e5297f"><rect x="39" y="3.5" width="4.5" height="4.5" rx="1"/><rect x="45.5" y="8" width="3.2" height="3.2" rx="1" fill="#c72fae"/><rect x="35" y="0.5" width="3" height="3" rx="1"/></g>
+      </svg>
+      <span class="wm"><span class="wm-make">Makeit</span><span class="wm-reel">Reel</span></span>
+    </a>
+    <nav>
+      <a href="#how">How it works</a><a href="#pricing">Pricing</a><a href="/login.html">Log in</a><a href="/register.html">Sign up</a>
+    </nav>
+    <div class="muted">© 2026 MakeItReel</div>
+  </div>
+</footer>
+
+<script src="/auth-ui.js"></script>
+<script>
+/* ---------- the generator tool ---------- */
+const $ = (id) => document.getElementById(id);
+const go = $("go"), urlInput = $("url"), panel = $("panel"), logEl = $("log"),
+      statusText = $("statusText"), spin = $("spin"), clipsEl = $("clips"),
+      loginGate = $("loginGate"), toolMain = $("toolMain"), toolMeta = $("toolMeta"),
+      voToggle = $("voToggle"), voVoice = $("voVoice"), voLock = $("voLock"), voSwitch = $("voSwitch");
+
+let ME = null; // { user, plan, usage }
+
+// Decide login-gated vs ready, and configure the plan-specific controls.
+async function initTool() {
+  try {
+    const r = await fetch("/api/me");
+    ME = await r.json();
+  } catch (_) { ME = { user: null }; }
+
+  if (!ME || !ME.user) {
+    loginGate.style.display = "block";
+    toolMain.style.display = "none";
+    return;
+  }
+  loginGate.style.display = "none";
+  toolMain.style.display = "block";
+  renderMeta();
+
+  // If the visitor arrived via the hero bar (or finished signup), prefill their link.
+  const pending = localStorage.getItem("mir_pendingUrl");
+  if (pending) {
+    localStorage.removeItem("mir_pendingUrl");
+    urlInput.value = pending;
+    document.getElementById("try").scrollIntoView({ behavior: "smooth" });
+  }
+
+  // Voiceover is a paid capability.
+  const canVoice = !!(ME.plan && ME.plan.voiceover);
+  voToggle.disabled = !canVoice;
+  voVoice.disabled = !canVoice || !voToggle.checked;
+  voLock.style.display = canVoice ? "none" : "inline-flex";
+  voSwitch.classList.toggle("locked", !canVoice);
+  voToggle.addEventListener("change", () => { voVoice.disabled = !voToggle.checked; });
+}
+
+function renderMeta() {
+  const p = ME.plan, u = ME.usage;
+  const left = u.videosPerMonth === -1
+    ? "Unlimited videos"
+    : `${Math.max(0, u.videosPerMonth - u.videos)} of ${u.videosPerMonth} videos left this month`;
+  toolMeta.innerHTML =
+    `<span class="meta-plan">${p.name} plan</span>` +
+    `<span class="meta-dot">•</span><span>${p.clipsPerVideo} clips / video</span>` +
+    `<span class="meta-dot">•</span><span>${p.resolution}p</span>` +
+    `<span class="meta-dot">•</span><span>${left}</span>` +
+    `<a class="meta-upgrade" href="/account.html">Manage plan →</a>`;
+}
+
+go.addEventListener("click", start);
+urlInput.addEventListener("keydown", (e) => { if (e.key === "Enter") start(); });
+
+async function start() {
+  const url = urlInput.value.trim();
+  if (!url) { urlInput.focus(); return; }
+  clipsEl.innerHTML = ""; logEl.textContent = ""; panel.classList.add("show");
+  spin.style.display = "inline-block"; statusText.textContent = "Starting…"; go.disabled = true;
+
+  const body = { url, voiceover: !voToggle.disabled && voToggle.checked, voice: voVoice.value };
+
+  let jobId;
+  try {
+    const r = await fetch("/api/clip", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const d = await r.json();
+    if (r.status === 401) { loginGate.style.display = "block"; toolMain.style.display = "none"; return; }
+    if (!r.ok) throw new Error((d.upgrade ? "⬆ " : "") + (d.error || "Failed to start"));
+    jobId = d.jobId;
+  } catch (err) { fail(err.message); return; }
+
+  poll(jobId);
+}
+
+async function poll(jobId) {
+  try {
+    const r = await fetch("/api/jobs/" + jobId);
+    const d = await r.json();
+    logEl.textContent = d.logs.map((l) => l.msg).join("\n");
+    logEl.scrollTop = logEl.scrollHeight;
+
+    if (d.status === "running") {
+      statusText.textContent = "Working on your clips…";
+      setTimeout(() => poll(jobId), 1500);
+    } else if (d.status === "done") {
+      spin.style.display = "none";
+      statusText.textContent = "✅ " + d.clips.length + " clips ready!";
+      go.disabled = false;
+      renderClips(d.clips);
+      initTool(); // refresh usage counter
+    } else {
+      fail(d.error || "Something went wrong");
+    }
+  } catch (err) { setTimeout(() => poll(jobId), 2000); }
+}
+
+function renderClips(clips) {
+  const canSchedule = !!(ME && ME.plan && ME.plan.scheduler);
+  clipsEl.innerHTML = clips.map((c) => `
+    <div class="clip">
+      <video src="${c.url}" controls preload="metadata"></video>
+      <div class="meta">
+        <div class="badges">
+          ${c.virality != null ? `<span class="v">🔥 ${c.virality}</span>` : ""}
+          ${c.narrated ? `<span class="v narr">🎙️ Narrated</span>` : ""}
+        </div>
+        <div class="t">${c.title || "Clip"}</div>
+        <a class="dl" href="${c.url}" download>Download</a>
+        ${canSchedule ? `<a class="sched-clip" data-url="${c.url}" data-title="${(c.title || "Clip").replace(/"/g, "&quot;")}">📅 Schedule post</a>` : ""}
+      </div>
+    </div>`).join("");
+  clipsEl.querySelectorAll(".sched-clip").forEach((b) => b.addEventListener("click", () => {
+    localStorage.setItem("mir_scheduleClip", JSON.stringify({ url: b.dataset.url, title: b.dataset.title }));
+    location.href = "/account.html#scheduler";
+  }));
+}
+
+function fail(msg) {
+  spin.style.display = "none";
+  statusText.innerHTML = '<span class="err">✕ ' + msg + '</span>';
+  go.disabled = false;
+}
+
+// ---------- hero paste-bar: capture the link, funnel logged-out visitors to signup ----------
+document.getElementById("heroBar").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const heroUrl = document.getElementById("heroUrl");
+  const link = heroUrl.value.trim();
+  if (!link) { heroUrl.focus(); return; }
+  localStorage.setItem("mir_pendingUrl", link);
+
+  // Already logged in? Drop the link straight into the tool. Otherwise send them to sign up.
+  let loggedIn = false;
+  try { loggedIn = !!(await (await fetch("/api/me")).json()).user; } catch (_) {}
+  if (loggedIn) {
+    localStorage.removeItem("mir_pendingUrl");
+    urlInput.value = link;
+    document.getElementById("try").scrollIntoView({ behavior: "smooth" });
+    urlInput.focus();
+  } else {
+    location.href = "/register.html";
+  }
+});
+
+initTool();
+</script>
+</body>
+</html>

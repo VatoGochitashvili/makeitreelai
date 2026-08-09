@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Reels — MakeItReel</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<nav class="site">
+  <div class="wrap">
+    <a class="logo" href="/">
+      <svg class="logo-mark" viewBox="0 0 52 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="mp" x1="10" y1="6" x2="42" y2="44" gradientUnits="userSpaceOnUse"><stop stop-color="#ff2d78"/><stop offset=".5" stop-color="#9b2fd0"/><stop offset="1" stop-color="#2b6fe6"/></linearGradient>
+          <linearGradient id="mf" x1="24" y1="10" x2="40" y2="44" gradientUnits="userSpaceOnUse"><stop stop-color="#5b8cff"/><stop offset="1" stop-color="#2b46c9"/></linearGradient>
+        </defs>
+        <path d="M30 8C42 12 46 26 40 38C46 24 40 12 30 8Z" fill="url(#mf)"/>
+        <path d="M33 11c9 4 12 16 6 26l-3-1c5-9 3-19-5-23Z" fill="url(#mf)"/>
+        <g fill="#cdd6ff"><rect x="35.5" y="15" width="2.2" height="2.2" rx=".5"/><rect x="38" y="20" width="2.2" height="2.2" rx=".5"/><rect x="38.6" y="26" width="2.2" height="2.2" rx=".5"/><rect x="37" y="32" width="2.2" height="2.2" rx=".5"/></g>
+        <path d="M12 12.6c0-2.5 2.7-4 4.8-2.8l21.6 12.3c2.1 1.2 2.1 4.3 0 5.5L16.8 39.9C14.7 41.1 12 39.6 12 37.1V12.6Z" fill="url(#mp)"/>
+        <g fill="#e5297f"><rect x="39" y="3.5" width="4.5" height="4.5" rx="1"/><rect x="45.5" y="8" width="3.2" height="3.2" rx="1" fill="#c72fae"/><rect x="35" y="0.5" width="3" height="3" rx="1"/></g>
+      </svg>
+      <span class="wm"><span class="wm-make">Makeit</span><span class="wm-reel">Reel</span></span>
+    </a>
+    <div class="nav-links"><a href="/">Home</a><a href="/#try">Generate</a><a href="/#pricing">Pricing</a></div>
+    <div class="nav-right" id="navRight">
+      <a class="btn ghost" href="/login.html">Log in</a>
+      <a class="btn" href="/register.html">Sign up free</a>
+    </div>
+  </div>
+</nav>
+
+<main class="wrap" id="page" style="display:none;padding:40px 24px 90px">
+  <header class="dash-head">
+    <div>
+      <h1>My Reels</h1>
+      <p class="muted" id="sub">Every clip you've generated, in one place.</p>
+    </div>
+    <a class="btn" href="/#try">+ New clips</a>
+  </header>
+
+  <div class="clips" id="reels"></div>
+
+  <div id="empty" class="login-gate" style="display:none">
+    <div class="lg-ic">🎬</div>
+    <h3>No reels yet</h3>
+    <p>Generate your first batch of clips and they'll show up here.</p>
+    <div class="cta-row" style="justify-content:center"><a class="btn" href="/#try">Make my reels →</a></div>
+  </div>
+</main>
+
+<!-- shown if not logged in -->
+<div class="auth-wrap" id="needLogin" style="display:none">
+  <div class="auth-card" style="text-align:center">
+    <h1>Please log in</h1>
+    <p class="sub">Log in to see your reels library.</p>
+    <a class="btn block lg" href="/login.html">Log in</a>
+    <div class="auth-alt">No account? <a href="/register.html">Sign up free</a></div>
+  </div>
+</div>
+
+<script src="/auth-ui.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+let ME = null;
+
+async function load() {
+  ME = await (await fetch("/api/me")).json();
+  if (!ME.user) { $("needLogin").style.display = "grid"; return; }
+  $("page").style.display = "block";
+
+  const { reels } = await (await fetch("/api/reels")).json();
+  if (!reels.length) { $("empty").style.display = "block"; $("sub").textContent = "Every clip you've generated, in one place."; return; }
+  $("sub").textContent = reels.length + (reels.length === 1 ? " clip" : " clips") + " in your library";
+
+  const canSchedule = !!(ME.plan && ME.plan.scheduler);
+  $("reels").innerHTML = reels.map((c) => `
+    <div class="clip" data-id="${c.id}">
+      <video src="${c.url}" controls preload="metadata"></video>
+      <div class="meta">
+        <div class="badges">
+          ${c.virality != null ? `<span class="v">🔥 ${c.virality}</span>` : ""}
+          ${c.narrated ? `<span class="v narr">🎙️ Narrated</span>` : ""}
+        </div>
+        <div class="t">${c.title || "Clip"}</div>
+        <div class="clip-date">${new Date(c.createdAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}</div>
+        <a class="dl" href="${c.url}" download>Download</a>
+        ${canSchedule ? `<a class="sched-clip" data-url="${c.url}" data-title="${(c.title || "Clip").replace(/"/g, "&quot;")}">📅 Schedule post</a>` : ""}
+        <button class="reel-del" data-del="${c.id}">Remove</button>
+      </div>
+    </div>`).join("");
+
+  $("reels").querySelectorAll(".sched-clip").forEach((b) => b.addEventListener("click", () => {
+    localStorage.setItem("mir_scheduleClip", JSON.stringify({ url: b.dataset.url, title: b.dataset.title }));
+    location.href = "/account.html#scheduler";
+  }));
+  $("reels").querySelectorAll(".reel-del").forEach((b) => b.addEventListener("click", async () => {
+    if (!confirm("Remove this clip from your library?")) return;
+    const r = await fetch("/api/reels/" + b.dataset.del, { method: "DELETE" });
+    if (r.ok) load();
+  }));
+}
+
+load();
+</script>
+</body>
+</html>
