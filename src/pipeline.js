@@ -13,7 +13,18 @@ import os from "node:os";
 import OpenAI from "openai";
 import { createReadStream } from "node:fs";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Lazily create the OpenAI client. Constructing it at import time throws when
+// OPENAI_API_KEY is unset, which would crash the whole server on boot — so we
+// defer it until a clip job actually needs it (server.js already rejects jobs
+// with a clear error when the key is missing).
+let _openai;
+function openai() {
+  if (!_openai) {
+    if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not set on the server.");
+    _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return _openai;
+}
 const MAX_CLIPS = parseInt(process.env.MAX_CLIPS || "6", 10);
 
 // --- small helper: run a shell command and capture output ---
@@ -70,7 +81,7 @@ const TRANSCRIBE_CHUNK_SEC = 15 * 60;
 
 // Send one audio file to Whisper and return its segments.
 async function transcribeFile(file) {
-  const res = await openai.audio.transcriptions.create({
+  const res = await openai().audio.transcriptions.create({
     file: createReadStream(file),
     model: "whisper-1",
     response_format: "verbose_json",
@@ -151,7 +162,7 @@ Return ONLY valid JSON in this exact shape:
 Transcript:
 ${transcript}`;
 
-  const completion = await openai.chat.completions.create({
+  const completion = await openai().chat.completions.create({
     model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
@@ -218,7 +229,7 @@ async function cutClip(videoPath, clip, index, workDir, resolution, log) {
 
 // --- 4b. AI voiceover: TTS the hook, then prepend a branded narrated intro card ---
 async function generateVoiceover(text, outPath, voice) {
-  const res = await openai.audio.speech.create({
+  const res = await openai().audio.speech.create({
     model: "gpt-4o-mini-tts",
     voice: voice || "alloy",
     input: text,
