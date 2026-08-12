@@ -34,7 +34,7 @@ app.post("/api/clip", async (req, res) => {
   const user = req.user;
   if (!user) return res.status(401).json({ error: "Please log in to generate clips." });
 
-  const { url, voiceover: voiceoverReq, voice } = req.body || {};
+  const { url, voiceover: voiceoverReq, voice, caption, length, clips: clipsReq } = req.body || {};
   if (!url || !/^https?:\/\//.test(url)) {
     return res.status(400).json({ error: "Please provide a valid video URL." });
   }
@@ -63,6 +63,18 @@ app.post("/api/clip", async (req, res) => {
   }
   const chosenVoice = VOICE_IDS.has(voice) ? voice : "alloy";
 
+  // Generation settings — validated, and never allowed past the plan's ceiling.
+  const chosenClips = Math.min(
+    plan.clipsPerVideo,
+    Math.max(1, parseInt(clipsReq, 10) || plan.clipsPerVideo)
+  );
+  const chosenCaption = {
+    style: ["bold", "highlight", "minimal", "none"].includes(caption?.style) ? caption.style : "bold",
+    position: ["top", "center", "bottom"].includes(caption?.position) ? caption.position : "top",
+    size: ["small", "medium", "large"].includes(caption?.size) ? caption.size : "medium",
+  };
+  const chosenLength = ["auto", "short", "medium", "long"].includes(length) ? length : "auto";
+
   // Count this run against the monthly quota up-front (cost control).
   bumpVideoUsage(user);
 
@@ -75,10 +87,12 @@ app.post("/api/clip", async (req, res) => {
 
   try {
     const { workDir, clips } = await makeClips(url, log, {
-      maxClips: plan.clipsPerVideo,
+      maxClips: chosenClips,
       resolution: plan.resolution,
       voiceover: wantVoiceover,
       voice: chosenVoice,
+      caption: chosenCaption,
+      length: chosenLength,
     });
     // move clips into the public folder so the browser can play/download them
     const outDir = path.join(CLIPS_DIR, id);
@@ -102,6 +116,30 @@ app.post("/api/clip", async (req, res) => {
   } catch (err) {
     job.status = "error";
     job.error = err.message;
+  }
+});
+
+// Video preview (title/author/thumbnail) via YouTube oEmbed — server-side so
+// the browser doesn't hit CORS. Falls back to a bare thumbnail when unknown.
+app.get("/api/preview", async (req, res) => {
+  const url = String(req.query.url || "");
+  if (!/^https?:\/\//.test(url)) return res.status(400).json({ error: "Invalid URL." });
+  try {
+    const r = await fetch(
+      "https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent(url),
+      { signal: AbortSignal.timeout(8000) }
+    );
+    if (!r.ok) return res.status(404).json({ error: "Preview unavailable." });
+    const d = await r.json();
+    res.json({
+      title: d.title,
+      author: d.author_name,
+      thumbnail: d.thumbnail_url,
+      width: d.width,
+      height: d.height,
+    });
+  } catch {
+    res.status(404).json({ error: "Preview unavailable." });
   }
 });
 

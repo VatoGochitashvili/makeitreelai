@@ -427,6 +427,71 @@ footer.site nav a:hover { color: var(--text); }
 .voice-select:disabled { opacity: .5; }
 .vo-lock { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--cyan); text-decoration: none; border: 1px solid var(--line2); padding: 7px 12px; border-radius: 100px; }
 
+/* ---------- link preview ---------- */
+.preview {
+  display: flex; gap: 16px; align-items: stretch; margin-top: 16px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px;
+}
+.pv-thumb {
+  position: relative; flex: 0 0 200px; aspect-ratio: 16/9; border-radius: 11px;
+  overflow: hidden; background: #000;
+}
+.pv-thumb img, .pv-thumb iframe { width: 100%; height: 100%; object-fit: cover; display: block; border: 0; }
+.pv-play {
+  position: absolute; inset: 0; margin: auto; width: 52px; height: 52px; border-radius: 50%;
+  background: rgba(0, 0, 0, .55); border: 1px solid rgba(255, 255, 255, .5); cursor: pointer;
+  display: grid; place-items: center; transition: transform .15s, background .15s;
+}
+.pv-play:hover { transform: scale(1.08); background: rgba(0, 0, 0, .75); }
+.pv-play::after {
+  content: ""; width: 0; height: 0; margin-left: 4px;
+  border-left: 16px solid #fff; border-top: 10px solid transparent; border-bottom: 10px solid transparent;
+}
+.pv-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+.pv-title { font-weight: 600; font-size: 15px; line-height: 1.35; }
+.pv-author { color: var(--muted); font-size: 13px; }
+.pv-ok { color: var(--lime); font-size: 12.5px; font-weight: 600; margin-top: 6px; }
+@media (max-width: 560px) { .preview { flex-direction: column; } .pv-thumb { flex-basis: auto; } }
+
+/* ---------- generation settings ---------- */
+.settings { margin-top: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; }
+.settings summary {
+  cursor: pointer; list-style: none; padding: 15px 18px; font-weight: 600; font-size: 15px;
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+}
+.settings summary::-webkit-details-marker { display: none; }
+.settings summary::after { content: "▾"; color: var(--muted); font-size: 13px; }
+.settings[open] summary::after { content: "▴"; }
+.settings .set-sum { color: var(--muted); font-weight: 500; font-size: 13px; margin-left: auto; }
+.set-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; padding: 4px 18px 18px;
+}
+@media (max-width: 760px) { .set-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 480px) { .set-grid { grid-template-columns: 1fr; } }
+.set-field label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+.set-field .voice-select { width: 100%; }
+.set-divider { height: 1px; background: var(--line); margin: 0 18px; }
+.settings .tool-options { padding: 16px 18px; margin-top: 0; justify-content: flex-start; }
+
+/* live caption mock */
+.cap-preview {
+  height: 44px; border-radius: 10px; background: linear-gradient(135deg, #2b2f45, #1a1d2e);
+  display: flex; justify-content: center; padding: 6px 8px; overflow: hidden;
+}
+.cap-preview.pos-top { align-items: flex-start; }
+.cap-preview.pos-center { align-items: center; }
+.cap-preview.pos-bottom { align-items: flex-end; }
+.cap-preview span {
+  font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; text-transform: uppercase;
+  white-space: nowrap; line-height: 1.1;
+}
+.cap-preview .size-small { font-size: 10px; }
+.cap-preview .size-medium { font-size: 12px; }
+.cap-preview .size-large { font-size: 14px; }
+.cap-preview .cap-bold { color: #fff; background: rgba(0, 0, 0, .6); padding: 2px 7px; border-radius: 3px; }
+.cap-preview .cap-highlight { color: #05070d; background: #64f2be; padding: 2px 7px; border-radius: 3px; }
+.cap-preview .cap-minimal { color: #fff; text-shadow: 0 2px 4px rgba(0, 0, 0, .9); }
+
 .clip .badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
 .clip .v { margin-bottom: 0; }
 .clip .v.narr { background: var(--cyan); }

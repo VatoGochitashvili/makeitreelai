@@ -155,22 +155,88 @@
           <input id="url" type="text" placeholder="Paste a YouTube or podcast link…" />
           <button class="btn" id="go">Make my reels</button>
         </div>
-        <div class="tool-options">
-          <label class="switch" id="voSwitch">
-            <input type="checkbox" id="voToggle">
-            <span class="track"></span>
-            <span class="switch-label">🔊 AI voiceover — narrated hook intro</span>
-          </label>
-          <select id="voVoice" class="voice-select" title="Narration voice">
-            <option value="alloy">Alloy — neutral</option>
-            <option value="nova">Nova — warm</option>
-            <option value="onyx">Onyx — deep</option>
-            <option value="shimmer">Shimmer — bright</option>
-            <option value="echo">Echo — calm</option>
-            <option value="fable">Fable — storyteller</option>
-          </select>
-          <a class="vo-lock" id="voLock" href="/account.html" style="display:none">🔒 Creator feature — upgrade</a>
+
+        <!-- link preview: thumbnail + title, click to play inline -->
+        <div class="preview" id="preview" style="display:none">
+          <div class="pv-thumb" id="pvThumb">
+            <img id="pvImg" alt="">
+            <button class="pv-play" id="pvPlay" title="Play video"></button>
+          </div>
+          <div class="pv-info">
+            <div class="pv-title" id="pvTitle">—</div>
+            <div class="pv-author" id="pvAuthor"></div>
+            <div class="pv-ok">✓ Video found — set your options below, then generate</div>
+          </div>
         </div>
+
+        <!-- pre-generation settings -->
+        <details class="settings" id="settings">
+          <summary><span>⚙️ Generation settings</span><span class="set-sum" id="setSum"></span></summary>
+          <div class="set-grid">
+            <div class="set-field">
+              <label for="setClips">Number of clips</label>
+              <select id="setClips" class="voice-select"></select>
+            </div>
+            <div class="set-field">
+              <label for="setLength">Clip length</label>
+              <select id="setLength" class="voice-select">
+                <option value="auto">Auto (15–60s)</option>
+                <option value="short">Short (15–30s)</option>
+                <option value="medium">Medium (30–45s)</option>
+                <option value="long">Long (45–60s)</option>
+              </select>
+            </div>
+            <div class="set-field">
+              <label for="setCapStyle">Caption style</label>
+              <select id="setCapStyle" class="voice-select">
+                <option value="bold">Bold Impact</option>
+                <option value="highlight">Lime Highlight</option>
+                <option value="minimal">Clean Minimal</option>
+                <option value="none">No captions</option>
+              </select>
+            </div>
+            <div class="set-field">
+              <label for="setCapPos">Caption position</label>
+              <select id="setCapPos" class="voice-select">
+                <option value="top">Top</option>
+                <option value="center">Center</option>
+                <option value="bottom">Bottom</option>
+              </select>
+            </div>
+            <div class="set-field">
+              <label for="setCapSize">Caption size</label>
+              <select id="setCapSize" class="voice-select">
+                <option value="small">Small</option>
+                <option value="medium" selected>Medium</option>
+                <option value="large">Large</option>
+              </select>
+            </div>
+            <div class="set-field">
+              <label>Caption preview</label>
+              <div class="cap-preview" id="capPreview"><span id="capSample">Your clip title</span></div>
+            </div>
+          </div>
+
+          <div class="set-divider"></div>
+
+          <div class="tool-options">
+            <label class="switch" id="voSwitch">
+              <input type="checkbox" id="voToggle">
+              <span class="track"></span>
+              <span class="switch-label">🔊 AI voiceover — narrated hook intro</span>
+            </label>
+            <select id="voVoice" class="voice-select" title="Narration voice">
+              <option value="alloy">Alloy — neutral</option>
+              <option value="nova">Nova — warm</option>
+              <option value="onyx">Onyx — deep</option>
+              <option value="shimmer">Shimmer — bright</option>
+              <option value="echo">Echo — calm</option>
+              <option value="fable">Fable — storyteller</option>
+            </select>
+            <a class="vo-lock" id="voLock" href="/account.html" style="display:none">🔒 Creator feature — upgrade</a>
+          </div>
+        </details>
+
         <div class="hint">Only clip videos you own or have rights to. 🔒</div>
         <div class="panel" id="panel">
           <div class="status"><span class="spinner" id="spin"></span><span id="statusText">Starting…</span></div>
@@ -363,8 +429,85 @@ async function initTool() {
   voVoice.disabled = !canVoice || !voToggle.checked;
   voLock.style.display = canVoice ? "none" : "inline-flex";
   voSwitch.classList.toggle("locked", !canVoice);
-  voToggle.addEventListener("change", () => { voVoice.disabled = !voToggle.checked; });
+  voToggle.addEventListener("change", () => { voVoice.disabled = !voToggle.checked; updateSetSum(); });
+
+  // Clip-count choices are capped by the plan.
+  const max = ME.plan.clipsPerVideo;
+  const sel = $("setClips");
+  sel.innerHTML = Array.from({ length: max }, (_, i) => i + 1)
+    .map((n) => `<option value="${n}"${n === max ? " selected" : ""}>${n} clip${n > 1 ? "s" : ""}</option>`).join("");
+
+  ["setClips", "setLength", "setCapStyle", "setCapPos", "setCapSize"].forEach((id) =>
+    $(id).addEventListener("change", () => { renderCapPreview(); updateSetSum(); }));
+  renderCapPreview(); updateSetSum();
+  if (urlInput.value.trim()) loadPreview(urlInput.value.trim());
 }
+
+// ---------- generation settings ----------
+function currentSettings() {
+  return {
+    clips: parseInt($("setClips").value, 10),
+    length: $("setLength").value,
+    caption: { style: $("setCapStyle").value, position: $("setCapPos").value, size: $("setCapSize").value },
+    voiceover: !voToggle.disabled && voToggle.checked,
+    voice: voVoice.value,
+  };
+}
+
+function updateSetSum() {
+  const s = currentSettings();
+  const capLabel = { bold: "Bold", highlight: "Highlight", minimal: "Minimal", none: "No captions" }[s.caption.style];
+  const lenLabel = { auto: "Auto", short: "15–30s", medium: "30–45s", long: "45–60s" }[s.length];
+  $("setSum").textContent = `${s.clips} clip${s.clips > 1 ? "s" : ""} · ${lenLabel} · ${capLabel}${s.voiceover ? " · 🔊 Voiceover" : ""}`;
+}
+
+// Live mock of how the burned-in caption will look.
+function renderCapPreview() {
+  const box = $("capPreview"), sample = $("capSample");
+  const style = $("setCapStyle").value, pos = $("setCapPos").value, size = $("setCapSize").value;
+  box.className = "cap-preview pos-" + pos;
+  sample.className = "cap-" + style + " size-" + size;
+  sample.style.display = style === "none" ? "none" : "inline";
+}
+
+// ---------- YouTube link preview ----------
+let previewTimer;
+function ytId(u) {
+  const m = String(u).match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([\w-]{11})/);
+  return m ? m[1] : null;
+}
+
+async function loadPreview(u) {
+  const id = ytId(u);
+  const pv = $("preview");
+  if (!id) { pv.style.display = "none"; return; }
+
+  // Show the thumbnail immediately, then fill in title/author.
+  $("pvThumb").innerHTML = `<img id="pvImg" src="https://img.youtube.com/vi/${id}/hqdefault.jpg" alt="">
+    <button class="pv-play" id="pvPlay" title="Play video"></button>`;
+  $("pvTitle").textContent = "Loading…"; $("pvAuthor").textContent = "";
+  pv.style.display = "flex";
+  $("pvPlay").addEventListener("click", () => {
+    $("pvThumb").innerHTML = `<iframe src="https://www.youtube.com/embed/${id}?autoplay=1"
+      title="Video preview" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+  });
+
+  try {
+    const r = await fetch("/api/preview?url=" + encodeURIComponent(u));
+    if (!r.ok) throw new Error();
+    const d = await r.json();
+    $("pvTitle").textContent = d.title || "Video";
+    $("pvAuthor").textContent = d.author ? "by " + d.author : "";
+  } catch {
+    $("pvTitle").textContent = "Video preview";
+    $("pvAuthor").textContent = "";
+  }
+}
+
+urlInput.addEventListener("input", () => {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => loadPreview(urlInput.value.trim()), 400);
+});
 
 function renderMeta() {
   const p = ME.plan, u = ME.usage;
@@ -388,7 +531,7 @@ async function start() {
   clipsEl.innerHTML = ""; logEl.textContent = ""; panel.classList.add("show");
   spin.style.display = "inline-block"; statusText.textContent = "Starting…"; go.disabled = true;
 
-  const body = { url, voiceover: !voToggle.disabled && voToggle.checked, voice: voVoice.value };
+  const body = { url, ...currentSettings() };
 
   let jobId;
   try {

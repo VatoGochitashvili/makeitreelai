@@ -143,16 +143,25 @@ async function transcribe(videoPath, workDir, log) {
   return segments;
 }
 
+// Clip-length presets the user can pick before generating.
+export const LENGTHS = {
+  auto: { label: "Auto", range: "15-60 seconds" },
+  short: { label: "Short (15–30s)", range: "15-30 seconds" },
+  medium: { label: "Medium (30–45s)", range: "30-45 seconds" },
+  long: { label: "Long (45–60s)", range: "45-60 seconds" },
+};
+
 // --- 3. ask the LLM to pick the best clip-worthy moments ---
-async function selectMoments(segments, log, maxClips = MAX_CLIPS) {
+async function selectMoments(segments, log, maxClips = MAX_CLIPS, lengthPref = "auto") {
   log("AI is finding the best moments…");
   // Build a compact timestamped transcript for the model
   const transcript = segments
     .map((s) => `[${s.start.toFixed(1)}-${s.end.toFixed(1)}] ${s.text.trim()}`)
     .join("\n");
 
+  const range = (LENGTHS[lengthPref] || LENGTHS.auto).range;
   const prompt = `You are an expert short-form video editor. Below is a timestamped transcript of a long video.
-Pick the ${maxClips} BEST standalone moments to turn into vertical short clips (15-60 seconds each).
+Pick the ${maxClips} BEST standalone moments to turn into vertical short clips (${range} each).
 Prefer strong hooks, punchlines, surprising insights, emotional or quotable lines.
 Each clip must start and end on a natural sentence boundary.
 
@@ -187,15 +196,45 @@ function dims(resolution) {
   return resolution >= 1080 ? { W: 1080, H: 1920 } : { W: 720, H: 1280 };
 }
 
+// On-screen caption styles the user can choose before generating.
+// `draw` returns the ffmpeg drawtext options for the chosen look.
+export const CAPTION_STYLES = {
+  bold: {
+    label: "Bold Impact",
+    draw: (size) => `fontcolor=white:fontsize=${size}:box=1:boxcolor=black@0.55:boxborderw=18`,
+  },
+  highlight: {
+    label: "Lime Highlight",
+    draw: (size) => `fontcolor=0x05070d:fontsize=${size}:box=1:boxcolor=0x64f2be@0.95:boxborderw=16`,
+  },
+  minimal: {
+    label: "Clean Minimal",
+    draw: (size) => `fontcolor=white:fontsize=${Math.round(size * 0.9)}:shadowcolor=black@0.8:shadowx=3:shadowy=3`,
+  },
+  none: { label: "No captions", draw: null },
+};
+
+// Vertical placement of the caption within the 9:16 frame.
+const CAPTION_POSITIONS = {
+  top: (H) => String(Math.round(H * 0.073)),
+  center: () => "(h-text_h)/2",
+  bottom: (H) => String(Math.round(H * 0.78)),
+};
+
 // --- 4. cut each moment into a vertical 9:16 clip with a title caption ---
-async function cutClip(videoPath, clip, index, workDir, resolution, log) {
+async function cutClip(videoPath, clip, index, workDir, resolution, caption, log) {
   const out = path.join(workDir, `clip_${index + 1}.mp4`);
   const dur = Math.max(1, clip.end - clip.start);
   const { W, H } = dims(resolution);
-  const fontsize = Math.round(W / 20); // ~54 @1080, ~36 @720
+  const style = CAPTION_STYLES[caption?.style] || CAPTION_STYLES.bold;
+  const sizeScale = { small: 0.8, medium: 1, large: 1.25 }[caption?.size] || 1;
+  const fontsize = Math.round((W / 20) * sizeScale); // ~54 @1080, ~36 @720
+  const yPos = (CAPTION_POSITIONS[caption?.position] || CAPTION_POSITIONS.top)(H);
 
-  // Escape the title for ffmpeg drawtext
-  const title = (clip.title || "").replace(/'/g, "’").replace(/:/g, " ").slice(0, 60);
+  // Escape the title for ffmpeg drawtext, and wrap so long titles fit the frame.
+  const title = (clip.title || "")
+    .replace(/'/g, "’").replace(/:/g, " ").slice(0, 60)
+    .replace(/(.{1,24})(\s+|$)/g, "$1\n").trim();
 
   // Filter: scale up, crop center to 9:16, then (if supported) draw the title.
   // Normalize fps/pixfmt/audio so clips can be safely concatenated with an intro.
@@ -205,9 +244,9 @@ async function cutClip(videoPath, clip, index, workDir, resolution, log) {
     `scale=${W}:${H}:force_original_aspect_ratio=increase`,
     `crop=${W}:${H}`,
   ];
-  if (await hasDrawtext()) {
-    filters.push(`drawtext=text='${title}':fontcolor=white:fontsize=${fontsize}:box=1:boxcolor=black@0.5:boxborderw=18:x=(w-text_w)/2:y=${Math.round(H * 0.073)}:line_spacing=8`);
-  } else if (index === 0) {
+  if (style.draw && await hasDrawtext()) {
+    filters.push(`drawtext=text='${title}':${style.draw(fontsize)}:x=(w-text_w)/2:y=${yPos}:line_spacing=8`);
+  } else if (style.draw && index === 0) {
     log("Note: this ffmpeg build has no 'drawtext' filter — clips will render without burned-in captions.");
   }
   const vf = filters.join(",");
@@ -293,17 +332,19 @@ export async function makeClips(url, log = () => {}, opts = {}) {
   const resolution = opts.resolution || 1080;
   const wantVoiceover = !!opts.voiceover;
   const voice = opts.voice || "alloy";
+  const caption = opts.caption || { style: "bold", position: "top", size: "medium" };
+  const lengthPref = opts.length || "auto";
 
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "makeitreel-"));
   try {
     const video = await downloadVideo(url, workDir, log);
     const segments = await transcribe(video, workDir, log);
     if (!segments.length) throw new Error("No speech found to transcribe.");
-    const moments = await selectMoments(segments, log, maxClips);
+    const moments = await selectMoments(segments, log, maxClips, lengthPref);
 
     const results = [];
     for (let i = 0; i < moments.length; i++) {
-      let file = await cutClip(video, moments[i], i, workDir, resolution, log);
+      let file = await cutClip(video, moments[i], i, workDir, resolution, caption, log);
       let narrated = false;
       if (wantVoiceover) {
         try {
