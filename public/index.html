@@ -233,6 +233,9 @@
               <option value="echo">Echo — calm</option>
               <option value="fable">Fable — storyteller</option>
             </select>
+            <button type="button" class="vo-sample" id="voSample" title="Hear this voice">
+              <span class="vs-ic"></span><span id="voSampleTxt">Preview voice</span>
+            </button>
             <a class="vo-lock" id="voLock" href="/account.html" style="display:none">🔒 Creator feature — upgrade</a>
           </div>
         </details>
@@ -503,6 +506,41 @@ async function loadPreview(u) {
     $("pvAuthor").textContent = "";
   }
 }
+
+// ---------- narration voice sample ----------
+let sampleAudio;
+document.getElementById("voSample").addEventListener("click", async function () {
+  const btn = this, txt = $("voSampleTxt"), voice = voVoice.value;
+
+  // Second click while playing = stop.
+  if (sampleAudio && !sampleAudio.paused) {
+    sampleAudio.pause(); sampleAudio = null;
+    btn.classList.remove("playing"); txt.textContent = "Preview voice";
+    return;
+  }
+
+  btn.disabled = true; btn.classList.add("loading"); txt.textContent = "Loading…";
+  try {
+    const r = await fetch("/api/voice-sample/" + voice);
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Could not load sample");
+    sampleAudio = new Audio(URL.createObjectURL(await r.blob()));
+    sampleAudio.onended = () => { btn.classList.remove("playing"); txt.textContent = "Preview voice"; };
+    await sampleAudio.play();
+    btn.classList.remove("loading"); btn.classList.add("playing"); txt.textContent = "Stop";
+  } catch (e) {
+    btn.classList.remove("loading"); txt.textContent = "Unavailable";
+    setTimeout(() => { txt.textContent = "Preview voice"; }, 2500);
+  } finally {
+    btn.disabled = false; btn.classList.remove("loading");
+  }
+});
+
+// Switching voice mid-playback stops the old sample.
+voVoice.addEventListener("change", () => {
+  if (sampleAudio) { sampleAudio.pause(); sampleAudio = null; }
+  const btn = document.getElementById("voSample");
+  btn.classList.remove("playing"); $("voSampleTxt").textContent = "Preview voice";
+});
 
 urlInput.addEventListener("input", () => {
   clearTimeout(previewTimer);

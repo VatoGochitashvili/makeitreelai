@@ -425,6 +425,29 @@ footer.site nav a:hover { color: var(--text); }
 .switch.locked { opacity: .55; cursor: not-allowed; }
 .voice-select { background: var(--bg2); border: 1px solid var(--line); color: var(--text); border-radius: 10px; padding: 9px 12px; font-size: 14px; font-family: inherit; outline: none; }
 .voice-select:disabled { opacity: .5; }
+/* narration voice sample button */
+.vo-sample {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  background: var(--glass); border: 1px solid var(--line2); color: var(--text);
+  border-radius: 100px; padding: 8px 15px; font: 600 13px/1 Inter, sans-serif;
+  transition: border-color .15s, background .15s;
+}
+.vo-sample:hover:not(:disabled) { border-color: var(--cyan); }
+.vo-sample:disabled { opacity: .6; cursor: default; }
+.vo-sample .vs-ic {
+  width: 0; height: 0; border-left: 10px solid var(--cyan);
+  border-top: 6px solid transparent; border-bottom: 6px solid transparent; flex: 0 0 auto;
+}
+.vo-sample.playing { border-color: var(--cyan); background: var(--grad-soft); }
+/* playing = square stop glyph */
+.vo-sample.playing .vs-ic {
+  width: 10px; height: 10px; border: none; border-radius: 2px; background: var(--cyan);
+}
+.vo-sample.loading .vs-ic {
+  width: 12px; height: 12px; border: 2px solid var(--line2); border-top-color: var(--cyan);
+  border-radius: 50%; animation: spin .7s linear infinite;
+}
+
 .vo-lock { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--cyan); text-decoration: none; border: 1px solid var(--line2); padding: 7px 12px; border-radius: 100px; }
 
 /* ---------- link preview ---------- */

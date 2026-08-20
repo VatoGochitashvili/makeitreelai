@@ -7,7 +7,10 @@ import { promises as fs, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", ".data");
+// Where persisted JSON lives. Set DATA_DIR to a mounted disk (e.g. /var/data
+// on Render) so accounts, schedule and reels survive restarts and redeploys.
+export const DATA_DIR = process.env.DATA_DIR
+  || path.join(path.dirname(fileURLToPath(import.meta.url)), "..", ".data");
 
 export function readJSON(name, fallback) {
   try {

@@ -4,11 +4,12 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
-import { makeClips } from "./src/pipeline.js";
+import { makeClips, synthSpeech } from "./src/pipeline.js";
 import { authRouter, attachUser, getUsage, bumpVideoUsage } from "./src/auth.js";
 import { schedulerRouter } from "./src/scheduler.js";
 import { reelsRouter, addReels } from "./src/reels.js";
 import { planOf, VOICE_IDS } from "./src/plans.js";
+import { DATA_DIR } from "./src/store.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -25,6 +26,10 @@ app.use("/api", reelsRouter);
 const CLIPS_DIR = path.join(__dirname, "public", "clips");
 await fs.mkdir(CLIPS_DIR, { recursive: true });
 app.use("/clips", express.static(CLIPS_DIR));
+
+// cached narration voice samples
+const SAMPLES_DIR = path.join(DATA_DIR, "voice-samples");
+await fs.mkdir(SAMPLES_DIR, { recursive: true }).catch(() => {});
 
 // in-memory job store (fine for MVP; swap for a DB later)
 const jobs = new Map(); // id -> { logs:[], status, clips:[], error }
@@ -140,6 +145,43 @@ app.get("/api/preview", async (req, res) => {
     });
   } catch {
     res.status(404).json({ error: "Preview unavailable." });
+  }
+});
+
+// Short spoken sample of a narration voice, so users can hear each one before
+// generating. Cached per voice (in memory + on disk) so we only pay for the
+// first request of each voice, ever.
+const SAMPLE_TEXT = "Here's the moment that changes everything \u2014 this is how your clips will sound.";
+const voiceSamples = new Map();
+
+app.get("/api/voice-sample/:voice", async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Please log in." });
+  const voice = req.params.voice;
+  if (!VOICE_IDS.has(voice)) return res.status(400).json({ error: "Unknown voice." });
+  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: "Voice samples unavailable: server is missing OPENAI_API_KEY." });
+
+  const send = (buf) => {
+    res.set("Content-Type", "audio/mpeg");
+    res.set("Cache-Control", "public, max-age=86400");
+    res.send(buf);
+  };
+
+  if (voiceSamples.has(voice)) return send(voiceSamples.get(voice));
+
+  const cacheFile = path.join(SAMPLES_DIR, `${voice}.mp3`);
+  try {
+    const buf = await fs.readFile(cacheFile);
+    voiceSamples.set(voice, buf);
+    return send(buf);
+  } catch { /* not cached yet — generate below */ }
+
+  try {
+    const buf = await synthSpeech(SAMPLE_TEXT, voice);
+    voiceSamples.set(voice, buf);
+    fs.writeFile(cacheFile, buf).catch(() => {}); // best-effort disk cache
+    send(buf);
+  } catch (err) {
+    res.status(502).json({ error: "Could not generate a sample: " + err.message });
   }
 });
 

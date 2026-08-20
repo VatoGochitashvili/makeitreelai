@@ -267,14 +267,17 @@ async function cutClip(videoPath, clip, index, workDir, resolution, caption, log
 }
 
 // --- 4b. AI voiceover: TTS the hook, then prepend a branded narrated intro card ---
-async function generateVoiceover(text, outPath, voice) {
+export async function synthSpeech(text, voice) {
   const res = await openai().audio.speech.create({
     model: "gpt-4o-mini-tts",
     voice: voice || "alloy",
     input: text,
   });
-  const buf = Buffer.from(await res.arrayBuffer());
-  await fs.writeFile(outPath, buf);
+  return Buffer.from(await res.arrayBuffer());
+}
+
+async function generateVoiceover(text, outPath, voice) {
+  await fs.writeFile(outPath, await synthSpeech(text, voice));
 }
 
 async function addNarratedIntro(baseClip, clip, index, workDir, resolution, voice, log) {
