@@ -410,6 +410,16 @@ footer.site nav a:hover { color: var(--text); }
 .login-gate h3 { font-size: 22px; margin-bottom: 6px; }
 .login-gate p { color: var(--muted); margin-bottom: 22px; }
 
+/* slim "you can preview, sign up to generate" notice */
+.signin-note {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  background: var(--grad-soft); border: 1px solid var(--line2); border-radius: 14px;
+  padding: 12px 18px; margin-bottom: 14px; font-size: 14px; color: var(--text);
+}
+.signin-note strong { font-weight: 700; }
+.signin-note .sn-links a { color: var(--cyan); text-decoration: none; font-weight: 600; }
+.signin-note .sn-links a:hover { text-decoration: underline; }
+
 .tool-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; justify-content: center; margin-bottom: 14px; color: var(--muted); font-size: 14px; }
 .tool-meta .meta-plan { font-weight: 700; color: var(--text); background: var(--grad-soft); border: 1px solid var(--line2); padding: 3px 11px; border-radius: 100px; }
 .tool-meta .meta-dot { color: var(--muted2); }

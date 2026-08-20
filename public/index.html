@@ -138,14 +138,9 @@
     </div>
     <div class="tool">
       <!-- shown when logged out -->
-      <div class="login-gate" id="loginGate" style="display:none">
-        <div class="lg-ic">🔒</div>
-        <h3>Log in to generate clips</h3>
-        <p>Create a free account to turn your first video into reels.</p>
-        <div class="cta-row" style="justify-content:center">
-          <a class="btn" href="/register.html">Sign up free</a>
-          <a class="btn ghost" href="/login.html">Log in</a>
-        </div>
+      <div class="signin-note" id="loginGate" style="display:none">
+        <span>👋 <strong>Preview any video free.</strong> Sign up when you're ready to generate clips.</span>
+        <span class="sn-links"><a href="/login.html">Log in</a></span>
       </div>
 
       <!-- shown when logged in -->
@@ -400,7 +395,8 @@ const go = $("go"), urlInput = $("url"), panel = $("panel"), logEl = $("log"),
       loginGate = $("loginGate"), toolMain = $("toolMain"), toolMeta = $("toolMeta"),
       voToggle = $("voToggle"), voVoice = $("voVoice"), voLock = $("voLock"), voSwitch = $("voSwitch");
 
-let ME = null; // { user, plan, usage }
+let ME = null;              // { user, plan, usage }
+let restoreSettings = null; // settings chosen before signing up
 
 // Decide login-gated vs ready, and configure the plan-specific controls.
 async function initTool() {
@@ -409,39 +405,65 @@ async function initTool() {
     ME = await r.json();
   } catch (_) { ME = { user: null }; }
 
-  if (!ME || !ME.user) {
-    loginGate.style.display = "block";
-    toolMain.style.display = "none";
-    return;
-  }
-  loginGate.style.display = "none";
+  // The tool is always visible — anyone can paste a link and preview it.
+  // Login is only required at the moment they hit "Make my reels".
+  const signedIn = !!(ME && ME.user);
+  loginGate.style.display = signedIn ? "none" : "flex";
   toolMain.style.display = "block";
-  renderMeta();
+  toolMeta.style.display = signedIn ? "" : "none";
+  go.textContent = signedIn ? "Make my reels" : "Make my reels →";
+  if (signedIn) renderMeta();
 
-  // If the visitor arrived via the hero bar (or finished signup), prefill their link.
+  // If the visitor arrived via the hero bar (or finished signup), restore
+  // the link and any settings they had chosen before signing up.
   const pending = localStorage.getItem("mir_pendingUrl");
   if (pending) {
     localStorage.removeItem("mir_pendingUrl");
     urlInput.value = pending;
     document.getElementById("try").scrollIntoView({ behavior: "smooth" });
   }
+  const pendingSet = localStorage.getItem("mir_pendingSettings");
+  if (pendingSet) {
+    localStorage.removeItem("mir_pendingSettings");
+    try {
+      const ps = JSON.parse(pendingSet);
+      restoreSettings = ps; // applied after the controls are built below
+    } catch (_) {}
+  }
 
-  // Voiceover is a paid capability.
+  // Voiceover is a paid capability (and needs an account at all).
   const canVoice = !!(ME.plan && ME.plan.voiceover);
   voToggle.disabled = !canVoice;
   voVoice.disabled = !canVoice || !voToggle.checked;
   voLock.style.display = canVoice ? "none" : "inline-flex";
+  if (!signedIn) { voLock.textContent = "🔒 Sign up to use AI voiceover"; voLock.href = "/register.html"; }
   voSwitch.classList.toggle("locked", !canVoice);
   voToggle.addEventListener("change", () => { voVoice.disabled = !voToggle.checked; updateSetSum(); });
 
-  // Clip-count choices are capped by the plan.
-  const max = ME.plan.clipsPerVideo;
+  // Clip-count choices are capped by the plan (signed-out visitors see the Free tier).
+  const max = (ME.plan && ME.plan.clipsPerVideo) || 3;
   const sel = $("setClips");
   sel.innerHTML = Array.from({ length: max }, (_, i) => i + 1)
     .map((n) => `<option value="${n}"${n === max ? " selected" : ""}>${n} clip${n > 1 ? "s" : ""}</option>`).join("");
 
   ["setClips", "setLength", "setCapStyle", "setCapPos", "setCapSize"].forEach((id) =>
     $(id).addEventListener("change", () => { renderCapPreview(); updateSetSum(); }));
+
+  // Re-apply anything chosen before signing up.
+  if (restoreSettings) {
+    const r = restoreSettings; restoreSettings = null;
+    if (r.clips && $("setClips").querySelector(`option[value="${r.clips}"]`)) $("setClips").value = r.clips;
+    if (r.length) $("setLength").value = r.length;
+    if (r.caption) {
+      $("setCapStyle").value = r.caption.style;
+      $("setCapPos").value = r.caption.position;
+      $("setCapSize").value = r.caption.size;
+    }
+    if (r.voiceover && canVoice) { voToggle.checked = true; voVoice.disabled = false; }
+    if (r.voice) voVoice.value = r.voice;
+    $("settings").open = true;
+  }
+
   renderCapPreview(); updateSetSum();
   if (urlInput.value.trim()) loadPreview(urlInput.value.trim());
 }
@@ -566,6 +588,16 @@ urlInput.addEventListener("keydown", (e) => { if (e.key === "Enter") start(); })
 async function start() {
   const url = urlInput.value.trim();
   if (!url) { urlInput.focus(); return; }
+
+  // Not signed in? Remember what they set up, then send them to sign up —
+  // they land back here with the link and settings restored.
+  if (!ME || !ME.user) {
+    localStorage.setItem("mir_pendingUrl", url);
+    localStorage.setItem("mir_pendingSettings", JSON.stringify(currentSettings()));
+    location.href = "/register.html";
+    return;
+  }
+
   clipsEl.innerHTML = ""; logEl.textContent = ""; panel.classList.add("show");
   spin.style.display = "inline-block"; statusText.textContent = "Starting…"; go.disabled = true;
 
@@ -638,19 +670,11 @@ document.getElementById("heroBar").addEventListener("submit", async (e) => {
   const heroUrl = document.getElementById("heroUrl");
   const link = heroUrl.value.trim();
   if (!link) { heroUrl.focus(); return; }
-  localStorage.setItem("mir_pendingUrl", link);
-
-  // Already logged in? Drop the link straight into the tool. Otherwise send them to sign up.
-  let loggedIn = false;
-  try { loggedIn = !!(await (await fetch("/api/me")).json()).user; } catch (_) {}
-  if (loggedIn) {
-    localStorage.removeItem("mir_pendingUrl");
-    urlInput.value = link;
-    document.getElementById("try").scrollIntoView({ behavior: "smooth" });
-    urlInput.focus();
-  } else {
-    location.href = "/register.html";
-  }
+  // Anyone — signed in or not — gets taken to the tool with a live preview.
+  // Signing up is only asked for when they hit "Make my reels".
+  urlInput.value = link;
+  document.getElementById("try").scrollIntoView({ behavior: "smooth" });
+  loadPreview(link);
 });
 
 initTool();
