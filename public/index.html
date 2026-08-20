@@ -530,6 +530,7 @@ function renderCapPreview() {
 
 // ---------- YouTube link preview + interval picker ----------
 let previewTimer, ytPlayer, videoDuration = 0, rangeSel = null, playheadTimer;
+let currentYtId = null, lastDuration = 0; // remember a video's duration so it never downgrades to "whole video"
 let rangeMode = "custom"; // "custom" (free ends) | "full" (whole video) | number (locked window width, seconds)
 
 function ytId(u) {
@@ -572,7 +573,7 @@ async function playInline(id) {
         onReady: (e) => {
           // Prefer the player's duration if yt-dlp didn't give us one.
           const d = e.target.getDuration();
-          if (d && !videoDuration) { videoDuration = d; setupRange(); }
+          if (d && !videoDuration) { videoDuration = d; lastDuration = d; setupRange(); }
           trackPlayhead();
         },
       },
@@ -598,6 +599,7 @@ function trackPlayhead() {
 
 // ---------- range selector ----------
 function setupRange() {
+  if (!videoDuration && lastDuration) videoDuration = lastDuration; // don't lose a known duration
   if (!videoDuration) {
     $("rangeWrap").style.display = "none";
     $("pvNoRange").style.display = "block";
@@ -772,8 +774,10 @@ async function loadPreview(u) {
   const pv = $("preview");
   if (!id) { pv.style.display = "none"; rangeSel = null; videoDuration = 0; return; }
 
-  // Reset any previous player/selection.
+  // Reset any previous player/selection. Keep lastDuration if it's the same
+  // video, so a duplicate/slow response can't wipe an already-shown range.
   clearInterval(playheadTimer);
+  if (id !== currentYtId) { currentYtId = id; lastDuration = 0; }
   ytPlayer = null; videoDuration = 0; rangeSel = null;
   $("pvStage").classList.remove("playing");
   $("pvStage").innerHTML =
@@ -794,6 +798,7 @@ async function loadPreview(u) {
     $("pvTitle").textContent = d.title || "Video";
     $("pvAuthor").textContent = d.author ? "by " + d.author : "";
     videoDuration = d.duration || 0;
+    if (videoDuration) lastDuration = videoDuration;
     setupRange();
   } catch {
     $("pvTitle").textContent = "Video preview";
