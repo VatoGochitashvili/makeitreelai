@@ -14,7 +14,14 @@ import { DATA_DIR } from "./src/store.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
+// Serve the app. HTML/CSS/JS use "no-cache" so a fresh deploy is picked up
+// immediately (the browser revalidates via ETag and gets a 304 when unchanged),
+// while media/fonts can still be cached.
+app.use(express.static(path.join(__dirname, "public"), {
+  setHeaders(res, filePath) {
+    if (/\.(html|css|js|svg)$/.test(filePath)) res.setHeader("Cache-Control", "no-cache");
+  },
+}));
 
 // accounts (register / login / logout / me / plan) — no billing yet
 app.use(attachUser);
