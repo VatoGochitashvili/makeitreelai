@@ -497,6 +497,16 @@ footer.site nav a:hover { color: var(--text); }
 .range-head b { color: var(--cyan); font-variant-numeric: tabular-nums; }
 .rg-len { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
 .rg-len.warn { color: #ff7a8a; }
+.range-presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.rg-chip {
+  background: var(--glass); border: 1px solid var(--line2); color: var(--muted);
+  border-radius: 100px; padding: 6px 14px; font: 600 13px Inter, sans-serif; cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.rg-chip:hover { color: var(--text); border-color: var(--cyan); }
+.rg-chip.active { color: #05070d; background: var(--grad); border-color: transparent; }
+.rg-hint { color: var(--cyan); font-size: 12px; font-weight: 600; text-align: center; flex: 1; }
+
 .range-track {
   position: relative; height: 42px; border-radius: 10px; background: var(--bg3);
   border: 1px solid var(--line); cursor: pointer;
@@ -531,6 +541,15 @@ footer.site nav a:hover { color: var(--text); }
   border-radius: 100px; padding: 5px 12px; font: 600 12px Inter, sans-serif;
 }
 .rg-reset:hover { color: var(--text); border-color: var(--cyan); }
+
+
+/* selection can be dragged to slide the window */
+.range-sel { cursor: grab; }
+.range-sel.grabbing { cursor: grabbing; }
+/* locked presets (fixed width / full video) hide the resize handles */
+.range.locked .range-h { display: none; }
+.range.locked:not(.windowed) .range-sel { cursor: default; }
+.range.windowed .range-sel { box-shadow: inset 0 0 0 1px rgba(34, 211, 238, .5); }
 
 /* ---------- generation settings ---------- */
 .settings { margin-top: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; }

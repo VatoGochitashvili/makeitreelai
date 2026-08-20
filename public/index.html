@@ -174,15 +174,16 @@
               <span class="rg-label">✂️ Clip from <b id="rgStart">0:00</b> → <b id="rgEnd">0:00</b></span>
               <span class="rg-len" id="rgLen"></span>
             </div>
+            <div class="range-presets" id="rgPresets"></div>
             <div class="range-track" id="rgTrack">
-              <div class="range-sel" id="rgSel"></div>
+              <div class="range-sel" id="rgSel" title="Drag to move the whole window"></div>
               <div class="range-playhead" id="rgPlayhead"></div>
               <div class="range-h" id="rgH1" title="Drag to set the start"><span></span></div>
               <div class="range-h" id="rgH2" title="Drag to set the end"><span></span></div>
             </div>
             <div class="range-foot">
               <span>0:00</span>
-              <button type="button" class="rg-reset" id="rgReset">Use whole video</button>
+              <span class="rg-hint" id="rgHint"></span>
               <span id="rgTotal">--:--</span>
             </div>
           </div>
@@ -529,6 +530,7 @@ function renderCapPreview() {
 
 // ---------- YouTube link preview + interval picker ----------
 let previewTimer, ytPlayer, videoDuration = 0, rangeSel = null, playheadTimer;
+let rangeMode = "custom"; // "custom" (free ends) | "full" (whole video) | number (locked window width, seconds)
 
 function ytId(u) {
   const m = String(u).match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([\w-]{11})/);
@@ -607,21 +609,80 @@ function setupRange() {
   $("pvDur").textContent = fmtTime(videoDuration) + " long";
   $("rgTotal").textContent = fmtTime(videoDuration);
 
-  // Default: the whole video, but cap very long sources at the first 20 min
-  // so people don't accidentally transcribe a 3-hour podcast.
-  const defEnd = Math.min(videoDuration, 20 * 60);
-  rangeSel = { start: 0, end: defEnd };
+  renderPresets();
+
+  // Default: long videos start on a locked window so nobody transcribes hours
+  // by accident; short ones default to the whole thing.
+  if (videoDuration > 25 * 60) applyPreset(20 * 60);
+  else if (videoDuration > 90) applyPreset("custom", { start: 0, end: videoDuration });
+  else applyPreset("full");
+}
+
+// Fixed-length "bracket" presets — only offer ones shorter than the video.
+function renderPresets() {
+  const chips = [];
+  [5, 15, 20, 30].forEach((m) => {
+    if (m * 60 < videoDuration - 5) chips.push({ label: m + " min", mode: m * 60 });
+  });
+  chips.push({ label: "Custom", mode: "custom" });
+  chips.push({ label: "Full video", mode: "full" });
+  $("rgPresets").innerHTML = chips.map((c) =>
+    `<button type="button" class="rg-chip" data-mode="${c.mode}">${c.label}</button>`).join("");
+  $("rgPresets").querySelectorAll(".rg-chip").forEach((b) => b.addEventListener("click", () => {
+    const raw = b.dataset.mode;
+    applyPreset(raw === "custom" || raw === "full" ? raw : Number(raw));
+  }));
+}
+
+function markActivePreset() {
+  $("rgPresets").querySelectorAll(".rg-chip").forEach((b) => {
+    const raw = b.dataset.mode;
+    const m = raw === "custom" || raw === "full" ? raw : Number(raw);
+    b.classList.toggle("active", m === rangeMode);
+  });
+}
+
+function applyPreset(mode, keep) {
+  rangeMode = mode;
+  const wrap = $("rangeWrap");
+
+  if (mode === "full") {
+    rangeSel = { start: 0, end: videoDuration };
+    wrap.classList.add("locked");            // hide the end/start handles
+    wrap.classList.remove("windowed");
+    $("rgHint").textContent = "Clips from the whole video";
+  } else if (mode === "custom") {
+    rangeSel = keep || rangeSel || { start: 0, end: Math.min(videoDuration, 20 * 60) };
+    wrap.classList.remove("locked", "windowed");
+    $("rgHint").textContent = "Drag the ends — or the middle to slide it";
+  } else {
+    // Locked-width window: keep the same start, snap the width to the bracket.
+    const width = Math.min(mode, videoDuration);
+    let start = rangeSel ? rangeSel.start : 0;
+    if (start + width > videoDuration) start = Math.max(0, videoDuration - width);
+    rangeSel = { start, end: start + width };
+    wrap.classList.add("locked", "windowed"); // handles hidden, window is draggable
+    $("rgHint").textContent = "Drag the window to move it";
+  }
+
   paintRange();
+  markActivePreset();
+  if (ytPlayer && ytPlayer.seekTo) ytPlayer.seekTo(rangeSel.start, true);
 }
 
 function paintRange() {
   if (!rangeSel || !videoDuration) return;
-  const a = (rangeSel.start / videoDuration) * 100;
-  const b = (rangeSel.end / videoDuration) * 100;
-  $("rgSel").style.left = a + "%";
-  $("rgSel").style.width = (b - a) + "%";
-  $("rgH1").style.left = a + "%";
-  $("rgH2").style.left = b + "%";
+  const track = $("rgTrack");
+  const w = track.clientWidth || 1;
+  const HALF = 11; // keep handle centres inside the track so they never clip
+  const aFrac = rangeSel.start / videoDuration;
+  const bFrac = rangeSel.end / videoDuration;
+
+  $("rgSel").style.left = (aFrac * 100) + "%";
+  $("rgSel").style.width = ((bFrac - aFrac) * 100) + "%";
+  $("rgH1").style.left = Math.min(w - HALF, Math.max(HALF, aFrac * w)) + "px";
+  $("rgH2").style.left = Math.min(w - HALF, Math.max(HALF, bFrac * w)) + "px";
+
   $("rgStart").textContent = fmtTime(rangeSel.start);
   $("rgEnd").textContent = fmtTime(rangeSel.end);
   const len = rangeSel.end - rangeSel.start;
@@ -630,8 +691,10 @@ function paintRange() {
   updateSetSum();
 }
 
+// Resize handles (only active in custom mode).
 function bindHandle(el, which) {
   const onDown = (ev) => {
+    if (rangeMode !== "custom") return;
     ev.preventDefault();
     const track = $("rgTrack");
     const move = (e) => {
@@ -650,7 +713,6 @@ function bindHandle(el, which) {
       document.removeEventListener("touchmove", move);
       document.removeEventListener("touchend", up);
       el.classList.remove("dragging");
-      // Jump the player to whichever edge was moved, so you can see it.
       if (ytPlayer && ytPlayer.seekTo) {
         ytPlayer.seekTo(which === "start" ? rangeSel.start : Math.max(0, rangeSel.end - 3), true);
       }
@@ -667,11 +729,43 @@ function bindHandle(el, which) {
 bindHandle($("rgH1"), "start");
 bindHandle($("rgH2"), "end");
 
-$("rgReset").addEventListener("click", () => {
-  if (!videoDuration) return;
-  rangeSel = { start: 0, end: videoDuration };
-  paintRange();
-});
+// Drag the whole selection to slide it (used for locked windows and custom).
+(function bindSelDrag() {
+  const sel = $("rgSel");
+  const onDown = (ev) => {
+    if (rangeMode === "full") return;
+    // In custom mode the handles sit on the sel edges — let them win.
+    if (ev.target.closest(".range-h")) return;
+    ev.preventDefault();
+    const track = $("rgTrack");
+    const r = track.getBoundingClientRect();
+    const startX = ev.touches ? ev.touches[0].clientX : ev.clientX;
+    const s0 = rangeSel.start;
+    const width = rangeSel.end - rangeSel.start;
+    const move = (e) => {
+      const x = e.touches ? e.touches[0].clientX : e.clientX;
+      const dt = ((x - startX) / r.width) * videoDuration;
+      let ns = Math.min(videoDuration - width, Math.max(0, s0 + dt));
+      rangeSel = { start: ns, end: ns + width };
+      paintRange();
+    };
+    const up = () => {
+      document.removeEventListener("mousemove", move);
+      document.removeEventListener("mouseup", up);
+      document.removeEventListener("touchmove", move);
+      document.removeEventListener("touchend", up);
+      sel.classList.remove("grabbing");
+      if (ytPlayer && ytPlayer.seekTo) ytPlayer.seekTo(rangeSel.start, true);
+    };
+    sel.classList.add("grabbing");
+    document.addEventListener("mousemove", move);
+    document.addEventListener("mouseup", up);
+    document.addEventListener("touchmove", move, { passive: false });
+    document.addEventListener("touchend", up);
+  };
+  sel.addEventListener("mousedown", onDown);
+  sel.addEventListener("touchstart", onDown, { passive: false });
+})();
 
 async function loadPreview(u) {
   const id = ytId(u);
