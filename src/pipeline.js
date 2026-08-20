@@ -90,6 +90,34 @@ async function transcribeFile(file) {
   return res.segments || [];
 }
 
+// Fetch source metadata (title, duration, thumbnail) without downloading the
+// video — used to draw the range selector before generating.
+export function probeVideoMeta(url) {
+  return new Promise((resolve, reject) => {
+    const p = spawn("yt-dlp", [
+      "--dump-single-json", "--skip-download", "--no-warnings", "--no-playlist", url,
+    ]);
+    let out = "", err = "";
+    p.stdout.on("data", (d) => (out += d.toString()));
+    p.stderr.on("data", (d) => (err += d.toString()));
+    p.on("error", reject);
+    const kill = setTimeout(() => p.kill("SIGKILL"), 25000);
+    p.on("close", (code) => {
+      clearTimeout(kill);
+      if (code !== 0) return reject(new Error(err.slice(-200) || `yt-dlp exited ${code}`));
+      try {
+        const d = JSON.parse(out);
+        resolve({
+          title: d.title,
+          author: d.uploader || d.channel,
+          duration: typeof d.duration === "number" ? d.duration : null,
+          thumbnail: d.thumbnail,
+        });
+      } catch (e) { reject(new Error("Could not parse video metadata.")); }
+    });
+  });
+}
+
 // --- 1. download the source video ---
 async function downloadVideo(url, workDir, log) {
   log("Downloading video…");
@@ -105,17 +133,31 @@ async function downloadVideo(url, workDir, log) {
 }
 
 // --- 2. transcribe with timestamps (Whisper) ---
-async function transcribe(videoPath, workDir, log) {
-  log("Transcribing audio…");
+async function transcribe(videoPath, workDir, log, range = null) {
+  // Only transcribe the slice the user selected — cheaper, and it keeps every
+  // clip inside their chosen interval. Offset is added back at the end so all
+  // timestamps stay absolute against the source video.
+  const offset = range ? Math.max(0, range.start) : 0;
+  if (range) {
+    const mins = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+    log(`Transcribing audio from ${mins(range.start)} to ${mins(range.end)}…`);
+  } else {
+    log("Transcribing audio…");
+  }
+
   // extract a compressed audio track first (smaller upload, cheaper)
   const audio = path.join(workDir, "audio.mp3");
-  await run("ffmpeg", ["-y", "-i", videoPath, "-vn", "-ac", "1", "-ar", "16000", "-b:a", "64k", audio]);
+  const extract = ["-y"];
+  if (range) extract.push("-ss", String(range.start), "-t", String(range.end - range.start));
+  extract.push("-i", videoPath, "-vn", "-ac", "1", "-ar", "16000", "-b:a", "64k", audio);
+  await run("ffmpeg", extract);
 
+  const shift = (segs) => (offset ? segs.map((x) => ({ ...x, start: x.start + offset, end: x.end + offset })) : segs);
   const size = (await fs.stat(audio)).size;
 
   // Short enough for a single upload.
   if (size <= WHISPER_LIMIT_BYTES) {
-    return await transcribeFile(audio); // [{ start, end, text }, ...]
+    return shift(await transcribeFile(audio)); // [{ start, end, text }, ...]
   }
 
   // Long podcasts exceed Whisper's 25MB limit — split into time chunks,
@@ -140,7 +182,7 @@ async function transcribe(videoPath, workDir, log) {
       segments.push({ ...s, start: s.start + start, end: s.end + start });
     }
   }
-  return segments;
+  return shift(segments);
 }
 
 // Clip-length presets the user can pick before generating.
@@ -337,11 +379,12 @@ export async function makeClips(url, log = () => {}, opts = {}) {
   const voice = opts.voice || "alloy";
   const caption = opts.caption || { style: "bold", position: "top", size: "medium" };
   const lengthPref = opts.length || "auto";
+  const range = opts.range || null; // { start, end } seconds, or null for the whole video
 
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "makeitreel-"));
   try {
     const video = await downloadVideo(url, workDir, log);
-    const segments = await transcribe(video, workDir, log);
+    const segments = await transcribe(video, workDir, log, range);
     if (!segments.length) throw new Error("No speech found to transcribe.");
     const moments = await selectMoments(segments, log, maxClips, lengthPref);
 

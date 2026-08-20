@@ -4,7 +4,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
-import { makeClips, synthSpeech } from "./src/pipeline.js";
+import { makeClips, synthSpeech, probeVideoMeta } from "./src/pipeline.js";
 import { authRouter, attachUser, getUsage, bumpVideoUsage } from "./src/auth.js";
 import { schedulerRouter } from "./src/scheduler.js";
 import { reelsRouter, addReels } from "./src/reels.js";
@@ -39,7 +39,7 @@ app.post("/api/clip", async (req, res) => {
   const user = req.user;
   if (!user) return res.status(401).json({ error: "Please log in to generate clips." });
 
-  const { url, voiceover: voiceoverReq, voice, caption, length, clips: clipsReq } = req.body || {};
+  const { url, voiceover: voiceoverReq, voice, caption, length, clips: clipsReq, range } = req.body || {};
   if (!url || !/^https?:\/\//.test(url)) {
     return res.status(400).json({ error: "Please provide a valid video URL." });
   }
@@ -80,6 +80,17 @@ app.post("/api/clip", async (req, res) => {
   };
   const chosenLength = ["auto", "short", "medium", "long"].includes(length) ? length : "auto";
 
+  // Optional [start, end] window — clips are only taken from this slice.
+  let chosenRange = null;
+  if (range && range.start != null && range.end != null) {
+    const start = Math.max(0, Number(range.start));
+    const end = Number(range.end);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end - start < 10) {
+      return res.status(400).json({ error: "Pick a range of at least 10 seconds." });
+    }
+    chosenRange = { start, end };
+  }
+
   // Count this run against the monthly quota up-front (cost control).
   bumpVideoUsage(user);
 
@@ -98,6 +109,7 @@ app.post("/api/clip", async (req, res) => {
       voice: chosenVoice,
       caption: chosenCaption,
       length: chosenLength,
+      range: chosenRange,
     });
     // move clips into the public folder so the browser can play/download them
     const outDir = path.join(CLIPS_DIR, id);
@@ -124,11 +136,31 @@ app.post("/api/clip", async (req, res) => {
   }
 });
 
-// Video preview (title/author/thumbnail) via YouTube oEmbed — server-side so
-// the browser doesn't hit CORS. Falls back to a bare thumbnail when unknown.
+// Video preview: title, author, thumbnail and — crucially — duration, which
+// the range selector needs. yt-dlp gives the real duration; oEmbed is the
+// fallback (no duration, so the UI then just uses the whole video).
+// Cached per URL so retyping doesn't re-run yt-dlp.
+const previewCache = new Map();
+
 app.get("/api/preview", async (req, res) => {
   const url = String(req.query.url || "");
   if (!/^https?:\/\//.test(url)) return res.status(400).json({ error: "Invalid URL." });
+
+  if (previewCache.has(url)) return res.json(previewCache.get(url));
+
+  const cacheAndSend = (data) => {
+    previewCache.set(url, data);
+    if (previewCache.size > 200) previewCache.delete(previewCache.keys().next().value);
+    res.json(data);
+  };
+
+  // Preferred: yt-dlp metadata (includes duration).
+  try {
+    const meta = await probeVideoMeta(url);
+    if (meta && meta.title) return cacheAndSend(meta);
+  } catch { /* fall through to oEmbed */ }
+
+  // Fallback: YouTube oEmbed (title/author/thumbnail only).
   try {
     const r = await fetch(
       "https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent(url),
@@ -136,12 +168,11 @@ app.get("/api/preview", async (req, res) => {
     );
     if (!r.ok) return res.status(404).json({ error: "Preview unavailable." });
     const d = await r.json();
-    res.json({
+    cacheAndSend({
       title: d.title,
       author: d.author_name,
       thumbnail: d.thumbnail_url,
-      width: d.width,
-      height: d.height,
+      duration: null,
     });
   } catch {
     res.status(404).json({ error: "Preview unavailable." });

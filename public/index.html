@@ -153,15 +153,41 @@
 
         <!-- link preview: thumbnail + title, click to play inline -->
         <div class="preview" id="preview" style="display:none">
-          <div class="pv-thumb" id="pvThumb">
+          <div class="pv-stage" id="pvStage">
             <img id="pvImg" alt="">
+            <div id="ytPlayer"></div>
             <button class="pv-play" id="pvPlay" title="Play video"></button>
           </div>
+
           <div class="pv-info">
-            <div class="pv-title" id="pvTitle">—</div>
-            <div class="pv-author" id="pvAuthor"></div>
-            <div class="pv-ok">✓ Video found — set your options below, then generate</div>
+            <div>
+              <div class="pv-title" id="pvTitle">—</div>
+              <div class="pv-author" id="pvAuthor"></div>
+            </div>
+            <div class="pv-dur" id="pvDur"></div>
           </div>
+
+          <!-- interval picker: drag the handles to choose which part of the
+               video the clips come from -->
+          <div class="range" id="rangeWrap" style="display:none">
+            <div class="range-head">
+              <span class="rg-label">✂️ Clip from <b id="rgStart">0:00</b> → <b id="rgEnd">0:00</b></span>
+              <span class="rg-len" id="rgLen"></span>
+            </div>
+            <div class="range-track" id="rgTrack">
+              <div class="range-sel" id="rgSel"></div>
+              <div class="range-playhead" id="rgPlayhead"></div>
+              <div class="range-h" id="rgH1" title="Drag to set the start"><span></span></div>
+              <div class="range-h" id="rgH2" title="Drag to set the end"><span></span></div>
+            </div>
+            <div class="range-foot">
+              <span>0:00</span>
+              <button type="button" class="rg-reset" id="rgReset">Use whole video</button>
+              <span id="rgTotal">--:--</span>
+            </div>
+          </div>
+
+          <div class="pv-ok" id="pvNoRange" style="display:none">✓ Video found — clips will be taken from the whole video</div>
         </div>
 
         <!-- pre-generation settings -->
@@ -470,20 +496,26 @@ async function initTool() {
 
 // ---------- generation settings ----------
 function currentSettings() {
-  return {
+  const out = {
     clips: parseInt($("setClips").value, 10),
     length: $("setLength").value,
     caption: { style: $("setCapStyle").value, position: $("setCapPos").value, size: $("setCapSize").value },
     voiceover: !voToggle.disabled && voToggle.checked,
     voice: voVoice.value,
   };
+  // Only send a range when it isn't the whole video.
+  if (rangeSel && videoDuration && (rangeSel.start > 0 || rangeSel.end < videoDuration - 1)) {
+    out.range = { start: Math.round(rangeSel.start), end: Math.round(rangeSel.end) };
+  }
+  return out;
 }
 
 function updateSetSum() {
   const s = currentSettings();
   const capLabel = { bold: "Bold", highlight: "Highlight", minimal: "Minimal", none: "No captions" }[s.caption.style];
   const lenLabel = { auto: "Auto", short: "15–30s", medium: "30–45s", long: "45–60s" }[s.length];
-  $("setSum").textContent = `${s.clips} clip${s.clips > 1 ? "s" : ""} · ${lenLabel} · ${capLabel}${s.voiceover ? " · 🔊 Voiceover" : ""}`;
+  const rangeLabel = s.range ? ` · ✂️ ${fmtTime(s.range.start)}–${fmtTime(s.range.end)}` : "";
+  $("setSum").textContent = `${s.clips} clip${s.clips > 1 ? "s" : ""} · ${lenLabel} · ${capLabel}${s.voiceover ? " · 🔊 Voiceover" : ""}${rangeLabel}`;
 }
 
 // Live mock of how the burned-in caption will look.
@@ -495,27 +527,171 @@ function renderCapPreview() {
   sample.style.display = style === "none" ? "none" : "inline";
 }
 
-// ---------- YouTube link preview ----------
-let previewTimer;
+// ---------- YouTube link preview + interval picker ----------
+let previewTimer, ytPlayer, videoDuration = 0, rangeSel = null, playheadTimer;
+
 function ytId(u) {
   const m = String(u).match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([\w-]{11})/);
   return m ? m[1] : null;
 }
 
+function fmtTime(sec) {
+  sec = Math.max(0, Math.round(sec));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s2 = sec % 60;
+  return h ? `${h}:${String(m).padStart(2, "0")}:${String(s2).padStart(2, "0")}`
+           : `${m}:${String(s2).padStart(2, "0")}`;
+}
+
+// Load the YouTube IFrame API once, so we can seek the player as handles move.
+let ytApiPromise;
+function loadYTApi() {
+  if (ytApiPromise) return ytApiPromise;
+  ytApiPromise = new Promise((resolve) => {
+    if (window.YT && window.YT.Player) return resolve(window.YT);
+    window.onYouTubeIframeAPIReady = () => resolve(window.YT);
+    const t = document.createElement("script");
+    t.src = "https://www.youtube.com/iframe_api";
+    t.onerror = () => resolve(null); // offline / blocked — fall back to a plain iframe
+    document.head.appendChild(t);
+    setTimeout(() => resolve(window.YT || null), 6000);
+  });
+  return ytApiPromise;
+}
+
+async function playInline(id) {
+  const stage = $("pvStage");
+  stage.classList.add("playing");
+  const YT = await loadYTApi();
+  if (YT && YT.Player) {
+    ytPlayer = new YT.Player("ytPlayer", {
+      videoId: id,
+      playerVars: { autoplay: 1, start: Math.floor(rangeSel ? rangeSel.start : 0), rel: 0 },
+      events: {
+        onReady: (e) => {
+          // Prefer the player's duration if yt-dlp didn't give us one.
+          const d = e.target.getDuration();
+          if (d && !videoDuration) { videoDuration = d; setupRange(); }
+          trackPlayhead();
+        },
+      },
+    });
+  } else {
+    document.getElementById("ytPlayer").outerHTML =
+      `<iframe id="ytPlayer" src="https://www.youtube.com/embed/${id}?autoplay=1&start=${Math.floor(rangeSel ? rangeSel.start : 0)}"
+        title="Video preview" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+  }
+}
+
+// Move a marker along the track showing where playback currently is.
+function trackPlayhead() {
+  clearInterval(playheadTimer);
+  playheadTimer = setInterval(() => {
+    if (!ytPlayer || !ytPlayer.getCurrentTime || !videoDuration) return;
+    const pct = (ytPlayer.getCurrentTime() / videoDuration) * 100;
+    const ph = $("rgPlayhead");
+    ph.style.left = Math.min(100, Math.max(0, pct)) + "%";
+    ph.style.display = "block";
+  }, 500);
+}
+
+// ---------- range selector ----------
+function setupRange() {
+  if (!videoDuration) {
+    $("rangeWrap").style.display = "none";
+    $("pvNoRange").style.display = "block";
+    rangeSel = null;
+    return;
+  }
+  $("pvNoRange").style.display = "none";
+  $("rangeWrap").style.display = "block";
+  $("pvDur").textContent = fmtTime(videoDuration) + " long";
+  $("rgTotal").textContent = fmtTime(videoDuration);
+
+  // Default: the whole video, but cap very long sources at the first 20 min
+  // so people don't accidentally transcribe a 3-hour podcast.
+  const defEnd = Math.min(videoDuration, 20 * 60);
+  rangeSel = { start: 0, end: defEnd };
+  paintRange();
+}
+
+function paintRange() {
+  if (!rangeSel || !videoDuration) return;
+  const a = (rangeSel.start / videoDuration) * 100;
+  const b = (rangeSel.end / videoDuration) * 100;
+  $("rgSel").style.left = a + "%";
+  $("rgSel").style.width = (b - a) + "%";
+  $("rgH1").style.left = a + "%";
+  $("rgH2").style.left = b + "%";
+  $("rgStart").textContent = fmtTime(rangeSel.start);
+  $("rgEnd").textContent = fmtTime(rangeSel.end);
+  const len = rangeSel.end - rangeSel.start;
+  $("rgLen").textContent = fmtTime(len) + " selected";
+  $("rgLen").classList.toggle("warn", len < 10);
+  updateSetSum();
+}
+
+function bindHandle(el, which) {
+  const onDown = (ev) => {
+    ev.preventDefault();
+    const track = $("rgTrack");
+    const move = (e) => {
+      const r = track.getBoundingClientRect();
+      const x = ((e.touches ? e.touches[0].clientX : e.clientX) - r.left) / r.width;
+      let t = Math.min(1, Math.max(0, x)) * videoDuration;
+      if (which === "start") rangeSel.start = Math.min(t, rangeSel.end - 10);
+      else rangeSel.end = Math.max(t, rangeSel.start + 10);
+      rangeSel.start = Math.max(0, rangeSel.start);
+      rangeSel.end = Math.min(videoDuration, rangeSel.end);
+      paintRange();
+    };
+    const up = () => {
+      document.removeEventListener("mousemove", move);
+      document.removeEventListener("mouseup", up);
+      document.removeEventListener("touchmove", move);
+      document.removeEventListener("touchend", up);
+      el.classList.remove("dragging");
+      // Jump the player to whichever edge was moved, so you can see it.
+      if (ytPlayer && ytPlayer.seekTo) {
+        ytPlayer.seekTo(which === "start" ? rangeSel.start : Math.max(0, rangeSel.end - 3), true);
+      }
+    };
+    el.classList.add("dragging");
+    document.addEventListener("mousemove", move);
+    document.addEventListener("mouseup", up);
+    document.addEventListener("touchmove", move, { passive: false });
+    document.addEventListener("touchend", up);
+  };
+  el.addEventListener("mousedown", onDown);
+  el.addEventListener("touchstart", onDown, { passive: false });
+}
+bindHandle($("rgH1"), "start");
+bindHandle($("rgH2"), "end");
+
+$("rgReset").addEventListener("click", () => {
+  if (!videoDuration) return;
+  rangeSel = { start: 0, end: videoDuration };
+  paintRange();
+});
+
 async function loadPreview(u) {
   const id = ytId(u);
   const pv = $("preview");
-  if (!id) { pv.style.display = "none"; return; }
+  if (!id) { pv.style.display = "none"; rangeSel = null; videoDuration = 0; return; }
 
-  // Show the thumbnail immediately, then fill in title/author.
-  $("pvThumb").innerHTML = `<img id="pvImg" src="https://img.youtube.com/vi/${id}/hqdefault.jpg" alt="">
-    <button class="pv-play" id="pvPlay" title="Play video"></button>`;
-  $("pvTitle").textContent = "Loading…"; $("pvAuthor").textContent = "";
-  pv.style.display = "flex";
-  $("pvPlay").addEventListener("click", () => {
-    $("pvThumb").innerHTML = `<iframe src="https://www.youtube.com/embed/${id}?autoplay=1"
-      title="Video preview" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
-  });
+  // Reset any previous player/selection.
+  clearInterval(playheadTimer);
+  ytPlayer = null; videoDuration = 0; rangeSel = null;
+  $("pvStage").classList.remove("playing");
+  $("pvStage").innerHTML =
+    `<img id="pvImg" src="https://img.youtube.com/vi/${id}/maxresdefault.jpg"
+        onerror="this.src='https://img.youtube.com/vi/${id}/hqdefault.jpg'" alt="">
+     <div id="ytPlayer"></div>
+     <button class="pv-play" id="pvPlay" title="Play video"></button>`;
+  $("pvPlay").addEventListener("click", () => playInline(id));
+  $("pvTitle").textContent = "Loading…";
+  $("pvAuthor").textContent = ""; $("pvDur").textContent = "";
+  $("rangeWrap").style.display = "none";
+  pv.style.display = "block";
 
   try {
     const r = await fetch("/api/preview?url=" + encodeURIComponent(u));
@@ -523,46 +699,14 @@ async function loadPreview(u) {
     const d = await r.json();
     $("pvTitle").textContent = d.title || "Video";
     $("pvAuthor").textContent = d.author ? "by " + d.author : "";
+    videoDuration = d.duration || 0;
+    setupRange();
   } catch {
     $("pvTitle").textContent = "Video preview";
     $("pvAuthor").textContent = "";
+    setupRange(); // no duration -> whole-video notice
   }
 }
-
-// ---------- narration voice sample ----------
-let sampleAudio;
-document.getElementById("voSample").addEventListener("click", async function () {
-  const btn = this, txt = $("voSampleTxt"), voice = voVoice.value;
-
-  // Second click while playing = stop.
-  if (sampleAudio && !sampleAudio.paused) {
-    sampleAudio.pause(); sampleAudio = null;
-    btn.classList.remove("playing"); txt.textContent = "Preview voice";
-    return;
-  }
-
-  btn.disabled = true; btn.classList.add("loading"); txt.textContent = "Loading…";
-  try {
-    const r = await fetch("/api/voice-sample/" + voice);
-    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Could not load sample");
-    sampleAudio = new Audio(URL.createObjectURL(await r.blob()));
-    sampleAudio.onended = () => { btn.classList.remove("playing"); txt.textContent = "Preview voice"; };
-    await sampleAudio.play();
-    btn.classList.remove("loading"); btn.classList.add("playing"); txt.textContent = "Stop";
-  } catch (e) {
-    btn.classList.remove("loading"); txt.textContent = "Unavailable";
-    setTimeout(() => { txt.textContent = "Preview voice"; }, 2500);
-  } finally {
-    btn.disabled = false; btn.classList.remove("loading");
-  }
-});
-
-// Switching voice mid-playback stops the old sample.
-voVoice.addEventListener("change", () => {
-  if (sampleAudio) { sampleAudio.pause(); sampleAudio = null; }
-  const btn = document.getElementById("voSample");
-  btn.classList.remove("playing"); $("voSampleTxt").textContent = "Preview voice";
-});
 
 urlInput.addEventListener("input", () => {
   clearTimeout(previewTimer);
