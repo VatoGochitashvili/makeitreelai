@@ -11,3 +11,18 @@ services:
         sync: false        # you paste this in the Render dashboard (never committed)
       - key: SESSION_SECRET
         generateValue: true  # keeps logins valid across restarts
+
+    # --- Persistence (optional) ---------------------------------------
+    # The free plan has an EPHEMERAL filesystem: accounts, the scheduler
+    # queue, saved reels and generated clips are wiped on every restart or
+    # redeploy. To keep them, move to a paid instance and uncomment BOTH
+    # the disk below and the DATA_DIR env var — the app writes all its
+    # state under DATA_DIR.
+    #
+    #   - key: DATA_DIR
+    #     value: /var/data
+    #
+    # disk:
+    #   name: makeitreel-data
+    #   mountPath: /var/data
+    #   sizeGB: 1
