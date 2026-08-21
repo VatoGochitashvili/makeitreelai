@@ -500,22 +500,31 @@ export async function makeClips(url, log = () => {}, opts = {}) {
   const caption = opts.caption || { style: "bold", position: "top", size: "medium" };
   const lengthPref = opts.length || "auto";
   const range = opts.range || null; // { start, end } seconds, or null for the whole video
+  // Reports the current phase so the UI can show a real progress bar instead
+  // of raw tool output. pct is an overall 0-100 estimate.
+  const progress = opts.onProgress || (() => {});
 
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "makeitreel-"));
   try {
     // An uploaded file skips the download entirely — no YouTube involved.
+    progress("download", 5);
     const video = opts.sourceFile
       ? (log("Using your uploaded video…"), opts.sourceFile)
       : await downloadVideo(url, workDir, log);
     const isAudioOnly = !(await hasVideoStream(video));
     if (isAudioOnly) log("Audio-only source — clips will be rendered as audiograms.");
 
+    progress("transcribe", 30);
     const segments = await transcribe(video, workDir, log, range);
     if (!segments.length) throw new Error("No speech found to transcribe.");
+    progress("moments", 60);
     const moments = await selectMoments(segments, log, maxClips, lengthPref);
 
     const results = [];
     for (let i = 0; i < moments.length; i++) {
+      progress("render", 70 + Math.round((i / Math.max(1, moments.length)) * 28), {
+        current: i + 1, total: moments.length,
+      });
       let file = isAudioOnly
         ? await cutAudiogram(video, moments[i], i, workDir, resolution, caption, log)
         : await cutClip(video, moments[i], i, workDir, resolution, caption, log);
@@ -539,6 +548,7 @@ export async function makeClips(url, log = () => {}, opts = {}) {
         narrated,
       });
     }
+    progress("done", 100);
     log("Done! Clips are ready.");
     return { workDir, clips: results };
   } catch (err) {

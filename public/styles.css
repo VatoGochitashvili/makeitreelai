@@ -274,6 +274,47 @@ section.block { padding: 90px 0; }
   border-radius: 50%; animation: spin .8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+/* ---------- job progress ---------- */
+.prog-bar { height: 10px; background: var(--bg3); border-radius: 100px; overflow: hidden; margin: 4px 0 12px; }
+.prog-fill {
+  height: 100%; width: 2%; border-radius: 100px; background: var(--grad);
+  transition: width .5s ease;
+  background-size: 200% 100%; animation: progShift 2.5s linear infinite;
+}
+@keyframes progShift { to { background-position: 200% 0; } }
+.prog-steps { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.pstep {
+  flex: 1; text-align: center; font-size: 12px; font-weight: 600; color: var(--muted2);
+  padding-top: 8px; border-top: 2px solid var(--line); transition: color .2s, border-color .2s;
+}
+.pstep.active { color: var(--cyan); border-top-color: var(--cyan); }
+.pstep.done { color: var(--lime); border-top-color: var(--lime); }
+.pstep.done::before { content: "✓ "; }
+.prog-hint { color: var(--muted2); font-size: 12.5px; text-align: center; }
+
+/* error card with a shareable code */
+.errbox { background: rgba(255,122,138,.08); border: 1px solid rgba(255,122,138,.35); border-radius: 14px; padding: 16px; }
+.err-head { color: #ff9aa6; font-weight: 700; font-size: 14.5px; margin-bottom: 12px; line-height: 1.45; }
+.err-code-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.err-code {
+  font-family: ui-monospace, monospace; font-size: 13px; font-weight: 700; color: var(--text);
+  background: var(--bg2); border: 1px solid var(--line2); border-radius: 8px; padding: 6px 12px;
+}
+.err-copy {
+  background: var(--glass); border: 1px solid var(--line2); color: var(--text); cursor: pointer;
+  border-radius: 8px; padding: 6px 12px; font: 600 12.5px Inter, sans-serif;
+}
+.err-copy:hover { border-color: var(--cyan); }
+.err-hint { color: var(--muted2); font-size: 12px; margin-top: 8px; }
+
+/* raw output tucked away */
+.tech { margin-top: 12px; }
+.tech summary { cursor: pointer; color: var(--muted2); font-size: 12.5px; font-weight: 600; list-style: none; }
+.tech summary::-webkit-details-marker { display: none; }
+.tech summary::before { content: "▸ "; }
+.tech[open] summary::before { content: "▾ "; }
+.tech .log { margin-top: 8px; }
+
 .log {
   font-family: ui-monospace, monospace; font-size: 12.5px; color: var(--muted);
   background: var(--bg2); border-radius: 10px; padding: 12px; max-height: 180px; overflow: auto; white-space: pre-wrap;

@@ -301,8 +301,32 @@
 
         <div class="hint">Only clip videos you own or have rights to. 🔒</div>
         <div class="panel" id="panel">
-          <div class="status"><span class="spinner" id="spin"></span><span id="statusText">Starting…</span></div>
-          <div class="log" id="log"></div>
+          <!-- friendly progress: a bar and named steps, not raw tool output -->
+          <div id="progWrap">
+            <div class="status"><span class="spinner" id="spin"></span><span id="statusText">Starting…</span></div>
+            <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
+            <div class="prog-steps" id="progSteps">
+              <span class="pstep" data-stage="download">Download</span>
+              <span class="pstep" data-stage="transcribe">Transcribe</span>
+              <span class="pstep" data-stage="moments">Find moments</span>
+              <span class="pstep" data-stage="render">Make clips</span>
+            </div>
+            <div class="prog-hint" id="progHint">This can take a few minutes — you can leave this tab open.</div>
+          </div>
+
+          <!-- shown only when something goes wrong -->
+          <div class="errbox" id="errBox" style="display:none">
+            <div class="err-head">✕ <span id="errMsg">Something went wrong</span></div>
+            <div class="err-code-row">
+              <span class="err-code" id="errCode">MIR-000000</span>
+              <button type="button" class="err-copy" id="errCopy">Copy error details</button>
+            </div>
+            <div class="err-hint">Paste these details to get help diagnosing it.</div>
+          </div>
+
+          <details class="tech"><summary>Technical details</summary>
+            <div class="log" id="log"></div>
+          </details>
         </div>
         <div class="clips" id="clips"></div>
       </div>
@@ -885,6 +909,11 @@ async function start(fromUpload) {
   }
 
   clipsEl.innerHTML = ""; logEl.textContent = ""; panel.classList.add("show");
+  $("errBox").style.display = "none";
+  $("progWrap").style.display = "block";
+  $("progFill").style.width = "2%";
+  $("progHint").textContent = "This can take a few minutes — you can leave this tab open.";
+  document.querySelectorAll(".pstep").forEach((el) => el.classList.remove("done", "active"));
   spin.style.display = "inline-block"; statusText.textContent = "Starting…";
   go.disabled = true; $("goFile").disabled = true;
 
@@ -902,6 +931,35 @@ async function start(fromUpload) {
   poll(jobId);
 }
 
+const STAGE_LABELS = {
+  queued: "Getting started…",
+  download: "Fetching your video…",
+  transcribe: "Transcribing the audio…",
+  moments: "AI is picking the best moments…",
+  render: "Rendering your clips…",
+  done: "Finishing up…",
+};
+
+function paintProgress(d) {
+  const pct = Math.max(2, Math.min(100, d.progress || 0));
+  $("progFill").style.width = pct + "%";
+
+  let label = STAGE_LABELS[d.stage] || "Working…";
+  if (d.stage === "render" && d.detail && d.detail.total) {
+    label = `Rendering clip ${d.detail.current} of ${d.detail.total}…`;
+  }
+  statusText.textContent = `${label} ${pct}%`;
+
+  // tick off the steps we've passed
+  const order = ["download", "transcribe", "moments", "render"];
+  const at = order.indexOf(d.stage);
+  document.querySelectorAll(".pstep").forEach((el) => {
+    const i = order.indexOf(el.dataset.stage);
+    el.classList.toggle("done", d.stage === "done" || (at > -1 && i < at));
+    el.classList.toggle("active", i === at);
+  });
+}
+
 async function poll(jobId) {
   try {
     const r = await fetch("/api/jobs/" + jobId);
@@ -910,16 +968,18 @@ async function poll(jobId) {
     logEl.scrollTop = logEl.scrollHeight;
 
     if (d.status === "running") {
-      statusText.textContent = "Working on your clips…";
+      paintProgress(d);
       setTimeout(() => poll(jobId), 1500);
     } else if (d.status === "done") {
+      paintProgress({ ...d, stage: "done", progress: 100 });
       spin.style.display = "none";
       statusText.textContent = "✅ " + d.clips.length + " clips ready!";
+      $("progHint").textContent = "";
       go.disabled = false; $("goFile").disabled = !uploadId;
       renderClips(d.clips);
       initTool(); // refresh usage counter
     } else {
-      fail(d.error || "Something went wrong");
+      fail(d.error || "Something went wrong", d.errorCode, d.logs);
     }
   } catch (err) { setTimeout(() => poll(jobId), 2000); }
 }
@@ -945,10 +1005,28 @@ function renderClips(clips) {
   }));
 }
 
-function fail(msg) {
+function fail(msg, code, logs) {
   spin.style.display = "none";
-  statusText.innerHTML = '<span class="err">✕ ' + msg + '</span>';
+  $("progWrap").style.display = "none";
+  $("errBox").style.display = "block";
+  $("errMsg").textContent = msg;
+  $("errCode").textContent = code || "MIR-LOCAL";
   go.disabled = false; $("goFile").disabled = !uploadId;
+
+  // Build one paste-able blob: code, message, and the last few log lines.
+  const tail = (logs || []).slice(-12).map((l) => l.msg).join("\n");
+  $("errCopy").onclick = async () => {
+    const text = `MakeItReel error\ncode: ${code || "MIR-LOCAL"}\nwhen: ${new Date().toISOString()}\nmessage: ${msg}\n\n--- log ---\n${tail}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      $("errCopy").textContent = "✓ Copied";
+      setTimeout(() => { $("errCopy").textContent = "Copy error details"; }, 2000);
+    } catch {
+      // clipboard blocked — drop it in the technical panel so it can be selected
+      logEl.textContent = text;
+      $("errCopy").textContent = "See technical details";
+    }
+  };
 }
 
 // ---------- hero paste-bar: capture the link, funnel logged-out visitors to signup ----------

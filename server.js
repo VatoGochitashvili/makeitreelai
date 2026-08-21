@@ -201,11 +201,19 @@ app.post("/api/clip", async (req, res) => {
   bumpVideoUsage(user);
 
   const id = randomUUID();
-  const job = { id, logs: [], status: "running", clips: [], error: null };
+  const job = {
+    id, logs: [], status: "running", clips: [], error: null,
+    stage: "queued", progress: 0, detail: null, errorCode: null,
+  };
   jobs.set(id, job);
   res.json({ jobId: id });
 
   const log = (msg) => { job.logs.push({ t: Date.now(), msg }); };
+  const onProgress = (stage, pct, detail) => {
+    job.stage = stage;
+    job.progress = Math.max(job.progress, pct); // never go backwards
+    job.detail = detail || null;
+  };
 
   try {
     const { workDir, clips } = await makeClips(url, log, {
@@ -217,6 +225,7 @@ app.post("/api/clip", async (req, res) => {
       length: chosenLength,
       range: chosenRange,
       sourceFile,
+      onProgress,
     });
     // move clips into the public folder so the browser can play/download them
     const outDir = path.join(CLIPS_DIR, id);
@@ -233,6 +242,7 @@ app.post("/api/clip", async (req, res) => {
     }
     job.clips = published;
     job.status = "done";
+    job.stage = "done"; job.progress = 100;
     // save this batch to the user's "My Reels" library
     addReels(user.id, published, url);
     // best-effort cleanup of the temp working dir (and the uploaded source)
@@ -245,6 +255,10 @@ app.post("/api/clip", async (req, res) => {
   } catch (err) {
     job.status = "error";
     job.error = err.message;
+    // Short code the user can quote when reporting a problem; the full detail
+    // stays in the job so support can look it up.
+    job.errorCode = "MIR-" + id.replace(/-/g, "").slice(0, 6).toUpperCase();
+    console.error(`[${job.errorCode}] job ${id} failed:`, err.message);
   }
 });
 
@@ -371,6 +385,10 @@ app.get("/api/jobs/:id", (req, res) => {
     logs: job.logs,
     clips: job.clips,
     error: job.error,
+    errorCode: job.errorCode,
+    stage: job.stage,
+    progress: job.progress,
+    detail: job.detail,
   });
 });
 
