@@ -35,6 +35,21 @@ await fs.mkdir(CLIPS_DIR, { recursive: true });
 app.use("/clips", express.static(CLIPS_DIR));
 
 // cached narration voice samples
+// YouTube cookies can be supplied as base64 (easiest on hosts with no disk):
+// set YTDLP_COOKIES_B64 to the base64 of a cookies.txt exported from a
+// logged-in browser. We decode it to a file and point yt-dlp at it.
+if (process.env.YTDLP_COOKIES_B64 && !process.env.YTDLP_COOKIES) {
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    const cookieFile = path.join(DATA_DIR, "yt-cookies.txt");
+    await fs.writeFile(cookieFile, Buffer.from(process.env.YTDLP_COOKIES_B64, "base64"));
+    process.env.YTDLP_COOKIES = cookieFile;
+    console.log("Loaded YouTube cookies from YTDLP_COOKIES_B64.");
+  } catch (e) {
+    console.warn("Could not write YTDLP_COOKIES_B64:", e.message);
+  }
+}
+
 const SAMPLES_DIR = path.join(DATA_DIR, "voice-samples");
 await fs.mkdir(SAMPLES_DIR, { recursive: true }).catch(() => {});
 

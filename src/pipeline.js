@@ -11,7 +11,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import OpenAI from "openai";
-import { createReadStream } from "node:fs";
+import { createReadStream, existsSync } from "node:fs";
 
 // Lazily create the OpenAI client. Constructing it at import time throws when
 // OPENAI_API_KEY is unset, which would crash the whole server on boot — so we
@@ -39,6 +39,32 @@ function run(cmd, args, { onLog } = {}) {
       code === 0 ? resolve() : reject(new Error(`${cmd} exited ${code}: ${stderr.slice(-500)}`))
     );
   });
+}
+
+// Shared yt-dlp args to survive cloud/datacenter IP blocks. YouTube bot-flags
+// datacenter IPs, so on a server you usually need cookies (a Netscape
+// cookies.txt from a logged-in browser) and/or a proxy. Provide them with:
+//   YTDLP_COOKIES     - path to a cookies.txt file
+//   YTDLP_PROXY       - http/https/socks proxy URL
+//   YTDLP_ARGS        - any extra raw args (space-separated)
+function ytdlpCommon() {
+  const args = ["--no-warnings", "--retries", "5", "--extractor-retries", "5", "--sleep-requests", "1"];
+  if (process.env.YTDLP_COOKIES && existsSync(process.env.YTDLP_COOKIES)) {
+    args.push("--cookies", process.env.YTDLP_COOKIES);
+  }
+  if (process.env.YTDLP_PROXY) args.push("--proxy", process.env.YTDLP_PROXY);
+  if (process.env.YTDLP_ARGS) args.push(...process.env.YTDLP_ARGS.split(" ").filter(Boolean));
+  return args;
+}
+
+// Turn yt-dlp's bot-block errors into something the user can act on.
+function friendlyDownloadError(msg) {
+  if (/Sign in to confirm|not a bot|429|Too Many Requests|cookies/i.test(msg)) {
+    return "YouTube is blocking downloads from this server (bot / rate-limit check). " +
+      "This is common on cloud hosts. Add YouTube cookies (YTDLP_COOKIES) or a residential " +
+      "proxy (YTDLP_PROXY) — see the README. It usually works fine from a home connection.";
+  }
+  return msg;
 }
 
 // --- small helper: read a media file's duration in seconds via ffprobe ---
@@ -95,7 +121,7 @@ async function transcribeFile(file) {
 export function probeVideoMeta(url) {
   return new Promise((resolve, reject) => {
     const p = spawn("yt-dlp", [
-      "--dump-single-json", "--skip-download", "--no-warnings", "--no-playlist", url,
+      ...ytdlpCommon(), "--dump-single-json", "--skip-download", "--no-playlist", url,
     ]);
     let out = "", err = "";
     p.stdout.on("data", (d) => (out += d.toString()));
@@ -123,12 +149,17 @@ async function downloadVideo(url, workDir, log) {
   log("Downloading video…");
   const out = path.join(workDir, "source.mp4");
   // -f best mp4, limit to 1080p to keep files sane
-  await run("yt-dlp", [
-    "-f", "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-    "--merge-output-format", "mp4",
-    "-o", out,
-    url,
-  ], { onLog: (l) => log(l.trim()) });
+  try {
+    await run("yt-dlp", [
+      ...ytdlpCommon(),
+      "-f", "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+      "--merge-output-format", "mp4",
+      "-o", out,
+      url,
+    ], { onLog: (l) => log(l.trim()) });
+  } catch (err) {
+    throw new Error(friendlyDownloadError(err.message));
+  }
   return out;
 }
 
