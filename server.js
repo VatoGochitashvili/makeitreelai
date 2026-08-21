@@ -11,6 +11,7 @@ import { schedulerRouter } from "./src/scheduler.js";
 import { reelsRouter, addReels } from "./src/reels.js";
 import { planOf, VOICE_IDS } from "./src/plans.js";
 import { DATA_DIR } from "./src/store.js";
+import { fetchPodcastFeed, normalizeUrl, isDirectMedia } from "./src/sources.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -265,6 +266,21 @@ app.get("/api/preview", async (req, res) => {
     res.json(data);
   };
 
+  // Direct media (podcast episode, Drive/Dropbox share, public mp4): ffprobe can
+  // read the duration straight off the remote file — no extractor involved.
+  const norm = normalizeUrl(url);
+  if (isDirectMedia(norm.url)) {
+    try {
+      const duration = await probeDurationSec(norm.url);
+      if (duration && isFinite(duration)) {
+        return cacheAndSend({
+          title: decodeURIComponent((norm.url.split("/").pop() || "Media").split("?")[0]),
+          author: null, duration, thumbnail: null, direct: true,
+        });
+      }
+    } catch { /* fall through */ }
+  }
+
   // Preferred: yt-dlp metadata (includes duration).
   try {
     const meta = await probeVideoMeta(url);
@@ -324,6 +340,25 @@ app.get("/api/voice-sample/:voice", async (req, res) => {
     send(buf);
   } catch (err) {
     res.status(502).json({ error: "Could not generate a sample: " + err.message });
+  }
+});
+
+// Podcast feed -> episode list. Feeds publish direct media URLs meant for
+// downloading, so this source can't be bot-blocked like YouTube.
+const feedCache = new Map();
+
+app.get("/api/podcast", async (req, res) => {
+  const url = String(req.query.url || "");
+  if (!/^https?:\/\//.test(url)) return res.status(400).json({ error: "Paste a podcast RSS feed URL." });
+
+  if (feedCache.has(url)) return res.json(feedCache.get(url));
+  try {
+    const data = await fetchPodcastFeed(url);
+    feedCache.set(url, data);
+    if (feedCache.size > 50) feedCache.delete(feedCache.keys().next().value);
+    res.json(data);
+  } catch (err) {
+    res.status(400).json({ error: err.message || "Could not read that feed." });
   }
 });
 

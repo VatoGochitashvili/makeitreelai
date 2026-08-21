@@ -11,7 +11,10 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import OpenAI from "openai";
-import { createReadStream, existsSync } from "node:fs";
+import { createReadStream, existsSync, createWriteStream } from "node:fs";
+import { Readable } from "node:stream";
+import { pipeline as streamPipeline } from "node:stream/promises";
+import { normalizeUrl, isDirectMedia } from "./sources.js";
 
 // Lazily create the OpenAI client. Constructing it at import time throws when
 // OPENAI_API_KEY is unset, which would crash the whole server on boot — so we
@@ -100,6 +103,44 @@ function hasDrawtext() {
   });
 }
 
+// Podcasts are often audio-only — we then render an "audiogram" instead of
+// cropping video. Detect which we're dealing with.
+export function hasVideoStream(file) {
+  return new Promise((resolve) => {
+    const p = spawn("ffprobe", [
+      "-v", "error", "-select_streams", "v:0",
+      "-show_entries", "stream=codec_type", "-of", "csv=p=0", file,
+    ]);
+    let out = "";
+    p.stdout.on("data", (d) => (out += d.toString()));
+    p.on("error", () => resolve(false));
+    p.on("close", () => resolve(/video/.test(out)));
+  });
+}
+
+// Fetch a plain media URL (podcast episode, Drive/Dropbox share, public mp4).
+// These are meant to be downloaded, so no extractor and no bot-blocking.
+async function downloadDirect(url, workDir, log) {
+  log("Downloading media…");
+  const res = await fetch(url, {
+    redirect: "follow",
+    headers: { "User-Agent": "MakeItReel/1.0" },
+    signal: AbortSignal.timeout(15 * 60 * 1000),
+  });
+  if (!res.ok) throw new Error(`Source returned ${res.status} — is the link public?`);
+
+  const ct = res.headers.get("content-type") || "";
+  if (/text\/html/i.test(ct)) {
+    throw new Error("That link returned a web page, not a media file. Use a direct/public file link.");
+  }
+  const ext = /audio\//.test(ct) ? ".mp3" : ".mp4";
+  const out = path.join(workDir, "source" + ext);
+  await streamPipeline(Readable.fromWeb(res.body), createWriteStream(out));
+  const mb = ((await fs.stat(out)).size / 1e6).toFixed(1);
+  log(`Downloaded ${mb} MB.`);
+  return out;
+}
+
 // Whisper rejects uploads over 25MB; stay safely under it.
 const WHISPER_LIMIT_BYTES = 24 * 1024 * 1024;
 // At 64kbps mono a 15-min chunk is ~7MB — comfortably under the limit.
@@ -145,7 +186,12 @@ export function probeVideoMeta(url) {
 }
 
 // --- 1. download the source video ---
-async function downloadVideo(url, workDir, log) {
+async function downloadVideo(rawUrl, workDir, log) {
+  // Share links (Drive/Dropbox) become direct-download links; plain media URLs
+  // and podcast episodes are fetched straight, bypassing yt-dlp entirely.
+  const { url } = normalizeUrl(rawUrl);
+  if (isDirectMedia(url)) return downloadDirect(url, workDir, log);
+
   log("Downloading video…");
   const out = path.join(workDir, "source.mp4");
   // -f best mp4, limit to 1080p to keep files sane
@@ -295,6 +341,49 @@ const CAPTION_POSITIONS = {
 };
 
 // --- 4. cut each moment into a vertical 9:16 clip with a title caption ---
+// Render an "audiogram" for audio-only sources (most podcasts): a branded
+// vertical card with a live waveform and the clip title.
+async function cutAudiogram(srcPath, clip, index, workDir, resolution, caption, log) {
+  const out = path.join(workDir, `clip_${index + 1}.mp4`);
+  const dur = Math.max(1, clip.end - clip.start);
+  const { W, H } = dims(resolution);
+  const style = CAPTION_STYLES[caption?.style] || CAPTION_STYLES.bold;
+  const sizeScale = { small: 0.8, medium: 1, large: 1.25 }[caption?.size] || 1;
+  const fontsize = Math.round((W / 18) * sizeScale);
+  const title = (clip.title || "")
+    .replace(/'/g, "’").replace(/:/g, " ").slice(0, 60)
+    .replace(/(.{1,20})(\s+|$)/g, "$1\n").trim();
+
+  log(`Rendering audiogram ${index + 1} @${H}p: "${clip.title || "untitled"}"…`);
+
+  // background colour + waveform strip drawn over it, then the title text
+  const waveH = Math.round(H * 0.26);
+  // dynaudnorm levels the audio *for the visual only*, so quiet and loud
+  // podcasts both produce a full waveform. White avoids the colour-space
+  // shifts some ffmpeg builds apply to tinted showwaves output.
+  const chain = [
+    `[1:a]dynaudnorm,showwaves=s=${W}x${waveH}:mode=cline:rate=25:draw=full:colors=white[wave]`,
+    `[0:v][wave]overlay=0:(H-h)/2:shortest=1[bg]`,
+  ];
+  const drawable = style.draw && await hasDrawtext();
+  chain.push(drawable
+    ? `[bg]drawtext=text='${title}':${style.draw(fontsize)}:x=(w-text_w)/2:y=${Math.round(H * 0.16)}:line_spacing=10[v]`
+    : `[bg]null[v]`);
+
+  await run("ffmpeg", [
+    "-y",
+    "-f", "lavfi", "-i", `color=c=0x0b1020:s=${W}x${H}:d=${dur}`,
+    "-ss", String(clip.start), "-t", String(dur), "-i", srcPath,
+    "-filter_complex", chain.join(";"),
+    "-map", "[v]", "-map", "1:a",
+    "-r", "25", "-pix_fmt", "yuv420p",
+    "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+    "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+    "-t", String(dur), out,
+  ]);
+  return out;
+}
+
 async function cutClip(videoPath, clip, index, workDir, resolution, caption, log) {
   const out = path.join(workDir, `clip_${index + 1}.mp4`);
   const dur = Math.max(1, clip.end - clip.start);
@@ -418,13 +507,18 @@ export async function makeClips(url, log = () => {}, opts = {}) {
     const video = opts.sourceFile
       ? (log("Using your uploaded video…"), opts.sourceFile)
       : await downloadVideo(url, workDir, log);
+    const isAudioOnly = !(await hasVideoStream(video));
+    if (isAudioOnly) log("Audio-only source — clips will be rendered as audiograms.");
+
     const segments = await transcribe(video, workDir, log, range);
     if (!segments.length) throw new Error("No speech found to transcribe.");
     const moments = await selectMoments(segments, log, maxClips, lengthPref);
 
     const results = [];
     for (let i = 0; i < moments.length; i++) {
-      let file = await cutClip(video, moments[i], i, workDir, resolution, caption, log);
+      let file = isAudioOnly
+        ? await cutAudiogram(video, moments[i], i, workDir, resolution, caption, log)
+        : await cutClip(video, moments[i], i, workDir, resolution, caption, log);
       let narrated = false;
       if (wantVoiceover) {
         try {

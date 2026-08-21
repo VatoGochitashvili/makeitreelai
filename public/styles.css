@@ -493,6 +493,23 @@ footer.site nav a:hover { color: var(--text); }
 .up-fill { height: 100%; width: 0; background: var(--grad); border-radius: 100px; transition: width .2s; }
 #goFile { margin-top: 14px; }
 
+/* ---------- podcast episode list ---------- */
+.ep-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; margin-top: 12px; }
+.ep {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left; width: 100%;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+  cursor: pointer; color: var(--text); font-family: inherit; transition: border-color .15s, background .15s;
+}
+.ep:hover { border-color: var(--line2); }
+.ep.sel { border-color: transparent; background: var(--grad-soft); box-shadow: inset 0 0 0 1px var(--cyan); }
+.ep-title { font-weight: 600; font-size: 14px; line-height: 1.35; }
+.ep-meta { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.ep-art {
+  width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 18px; font-size: 56px; background: linear-gradient(140deg, #131a3a, #0b1020);
+}
+.ep-art audio { width: 86%; }
+
 /* ---------- link preview + interval picker ---------- */
 .preview {
   margin-top: 16px; background: var(--card); border: 1px solid var(--line);

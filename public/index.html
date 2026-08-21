@@ -149,6 +149,7 @@
         <div class="src-tabs">
           <button type="button" class="src-tab active" data-src="link">🔗 Paste a link</button>
           <button type="button" class="src-tab" data-src="file">⬆️ Upload a file</button>
+          <button type="button" class="src-tab" data-src="podcast">🎙️ Podcast</button>
         </div>
 
         <div id="srcLink">
@@ -175,6 +176,16 @@
             <div class="up-bar"><div class="up-fill" id="upFill"></div></div>
           </div>
           <button class="btn block" id="goFile" disabled>Make my reels</button>
+        </div>
+
+        <div id="srcPodcast" style="display:none">
+          <div class="box">
+            <input id="feedUrl" type="text" placeholder="Paste your podcast RSS feed URL…" />
+            <button class="btn" id="feedGo">Load episodes</button>
+          </div>
+          <div class="src-note">Podcast feeds publish episodes for download — this source is never blocked.</div>
+          <div class="auth-msg" id="feedMsg"></div>
+          <div class="ep-list" id="epList"></div>
         </div>
 
         <!-- link preview: thumbnail + title, click to play inline -->
@@ -959,13 +970,74 @@ let uploadId = null, uploadXhr = null, localObjectUrl = null;
 document.querySelectorAll(".src-tab").forEach((t) => t.addEventListener("click", () => {
   document.querySelectorAll(".src-tab").forEach((x) => x.classList.remove("active"));
   t.classList.add("active");
-  const isFile = t.dataset.src === "file";
-  $("srcLink").style.display = isFile ? "none" : "block";
-  $("srcFile").style.display = isFile ? "block" : "none";
-  // Clear the other source so we never send both.
-  if (isFile) { urlInput.value = ""; $("preview").style.display = "none"; }
+  const src = t.dataset.src;
+  $("srcLink").style.display = src === "link" ? "block" : "none";
+  $("srcFile").style.display = src === "file" ? "block" : "none";
+  $("srcPodcast").style.display = src === "podcast" ? "block" : "none";
+  // Clear the other sources so we never send two at once.
+  if (src === "file") { urlInput.value = ""; $("preview").style.display = "none"; }
   else clearUpload();
+  if (src !== "podcast") $("epList").innerHTML = "";
 }));
+
+// ---------- podcast feed ----------
+$("feedGo").addEventListener("click", loadFeed);
+$("feedUrl").addEventListener("keydown", (e) => { if (e.key === "Enter") loadFeed(); });
+
+async function loadFeed() {
+  const feed = $("feedUrl").value.trim();
+  const msg = $("feedMsg"), list = $("epList");
+  if (!feed) { $("feedUrl").focus(); return; }
+  msg.className = "auth-msg"; msg.textContent = "Loading episodes…"; list.innerHTML = "";
+  try {
+    const r = await fetch("/api/podcast?url=" + encodeURIComponent(feed));
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Could not read that feed");
+    msg.className = "auth-msg ok"; msg.textContent = `${d.show} — ${d.episodes.length} episodes`;
+    list.innerHTML = d.episodes.map((e, i) => `
+      <button type="button" class="ep" data-i="${i}">
+        <span class="ep-title">${e.title.replace(/</g, "&lt;")}</span>
+        <span class="ep-meta">${e.duration ? fmtTime(e.duration) : ""}${e.date ? " · " + new Date(e.date).toLocaleDateString() : ""}</span>
+      </button>`).join("");
+    list.querySelectorAll(".ep").forEach((b) => b.addEventListener("click", () => {
+      list.querySelectorAll(".ep").forEach((x) => x.classList.remove("sel"));
+      b.classList.add("sel");
+      const ep = d.episodes[+b.dataset.i];
+      // An episode is just a direct media URL — reuse the normal link flow.
+      urlInput.value = ep.url;
+      showEpisodePreview(ep);
+    }));
+  } catch (err) {
+    msg.className = "auth-msg err"; msg.textContent = err.message;
+  }
+}
+
+// Preview a chosen episode: audio player + the same interval picker.
+function showEpisodePreview(ep) {
+  const pv = $("preview");
+  currentYtId = null; ytPlayer = null;
+  videoDuration = ep.duration || 0; lastDuration = videoDuration; rangeSel = null;
+  clearInterval(playheadTimer);
+
+  $("pvStage").classList.add("playing");
+  $("pvStage").innerHTML = `<div class="ep-art">🎙️<audio id="epAudio" src="${ep.url}" controls preload="metadata"></audio></div>`;
+  $("pvTitle").textContent = ep.title;
+  $("pvAuthor").textContent = "Podcast episode";
+  pv.style.display = "block";
+
+  const a = document.getElementById("epAudio");
+  a.addEventListener("loadedmetadata", () => {
+    if (a.duration && isFinite(a.duration)) { videoDuration = a.duration; lastDuration = a.duration; setupRange(); }
+  });
+  playheadTimer = setInterval(() => {
+    if (!videoDuration || !a.duration) return;
+    const ph = $("rgPlayhead");
+    ph.style.left = Math.min(100, Math.max(0, (a.currentTime / videoDuration) * 100)) + "%";
+    ph.style.display = "block";
+  }, 500);
+
+  setupRange();
+}
 
 const dropZone = $("dropZone"), fileInput = $("fileInput");
 dropZone.addEventListener("click", () => fileInput.click());
