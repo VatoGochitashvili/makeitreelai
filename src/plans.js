@@ -6,16 +6,19 @@ export const PLANS = {
     key: "free", name: "Free", price: 0, blurb: "Kick the tires.",
     clipsPerVideo: 3, videosPerMonth: 2, resolution: 720,
     captions: true, voiceover: false, scheduler: false, faceTracking: false, workspaces: 1,
+    maxUploadMB: 500,
   },
   creator: {
     key: "creator", name: "Creator", price: 19, blurb: "For serious podcasters.",
     clipsPerVideo: 10, videosPerMonth: -1, resolution: 1080,
     captions: true, voiceover: true, scheduler: true, faceTracking: false, workspaces: 1,
+    maxUploadMB: 2048,
   },
   pro: {
     key: "pro", name: "Pro", price: 49, blurb: "Agencies & teams.",
     clipsPerVideo: 10, videosPerMonth: -1, resolution: 1080,
     captions: true, voiceover: true, scheduler: true, faceTracking: true, workspaces: 3,
+    maxUploadMB: 5120,
   },
 };
 

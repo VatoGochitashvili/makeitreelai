@@ -4,7 +4,8 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
-import { makeClips, synthSpeech, probeVideoMeta } from "./src/pipeline.js";
+import { makeClips, synthSpeech, probeVideoMeta, probeDurationSec } from "./src/pipeline.js";
+import { createWriteStream } from "node:fs";
 import { authRouter, attachUser, getUsage, bumpVideoUsage } from "./src/auth.js";
 import { schedulerRouter } from "./src/scheduler.js";
 import { reelsRouter, addReels } from "./src/reels.js";
@@ -53,6 +54,79 @@ if (process.env.YTDLP_COOKIES_B64 && !process.env.YTDLP_COOKIES) {
 const SAMPLES_DIR = path.join(DATA_DIR, "voice-samples");
 await fs.mkdir(SAMPLES_DIR, { recursive: true }).catch(() => {});
 
+// ---------- direct file upload ----------
+// The reliable path: the user hands us their own video, so no third party can
+// block us. Raw bytes are streamed straight to disk (no multipart dependency).
+const UPLOAD_DIR = path.join(DATA_DIR, "uploads");
+await fs.mkdir(UPLOAD_DIR, { recursive: true }).catch(() => {});
+
+const uploads = new Map(); // uploadId -> { userId, file, name, size, duration, at }
+const ALLOWED_VIDEO = /\.(mp4|mov|m4v|webm|mkv|avi|mp3|m4a|wav)$/i;
+
+app.post("/api/upload", async (req, res) => {
+  const user = req.user;
+  if (!user) return res.status(401).json({ error: "Please log in to upload." });
+
+  const plan = planOf(user.plan);
+  const maxBytes = plan.maxUploadMB * 1024 * 1024;
+  const declared = Number(req.headers["content-length"] || 0);
+  if (declared && declared > maxBytes) {
+    return res.status(413).json({
+      error: `That file is larger than your ${plan.name} plan's ${plan.maxUploadMB} MB limit.`,
+      upgrade: true,
+    });
+  }
+
+  const name = String(req.query.name || "video.mp4").replace(/[^\w.\- ]/g, "_").slice(-80);
+  if (!ALLOWED_VIDEO.test(name)) {
+    return res.status(400).json({ error: "Unsupported file type. Use mp4, mov, webm, mkv, mp3 or wav." });
+  }
+
+  const id = randomUUID();
+  const ext = (name.match(ALLOWED_VIDEO) || [".mp4"])[0];
+  const file = path.join(UPLOAD_DIR, id + ext);
+  const out = createWriteStream(file);
+
+  let written = 0, aborted = false;
+  const fail = async (code, msg) => {
+    if (aborted) return;
+    aborted = true;
+    req.unpipe(out); out.destroy();
+    await fs.rm(file, { force: true }).catch(() => {});
+    if (!res.headersSent) res.status(code).json({ error: msg });
+  };
+
+  req.on("data", (chunk) => {
+    written += chunk.length;
+    if (written > maxBytes) fail(413, `Upload exceeds your ${plan.name} plan's ${plan.maxUploadMB} MB limit.`);
+  });
+  req.on("aborted", () => fail(499, "Upload cancelled."));
+  out.on("error", () => fail(500, "Could not save the upload."));
+
+  req.pipe(out);
+
+  out.on("finish", async () => {
+    if (aborted) return;
+    if (!written) return fail(400, "The upload was empty.");
+    let duration = null;
+    try { duration = await probeDurationSec(file); } catch { /* unknown duration */ }
+    uploads.set(id, { userId: user.id, file, name, size: written, duration, at: Date.now() });
+    res.json({ uploadId: id, name, size: written, duration });
+  });
+});
+
+// Drop uploads older than 6 hours so disks don't fill up.
+const uploadSweep = setInterval(async () => {
+  const cutoff = Date.now() - 6 * 60 * 60 * 1000;
+  for (const [id, u] of uploads) {
+    if (u.at < cutoff) {
+      uploads.delete(id);
+      await fs.rm(u.file, { force: true }).catch(() => {});
+    }
+  }
+}, 30 * 60 * 1000);
+uploadSweep.unref?.();
+
 // in-memory job store (fine for MVP; swap for a DB later)
 const jobs = new Map(); // id -> { logs:[], status, clips:[], error }
 
@@ -61,9 +135,18 @@ app.post("/api/clip", async (req, res) => {
   const user = req.user;
   if (!user) return res.status(401).json({ error: "Please log in to generate clips." });
 
-  const { url, voiceover: voiceoverReq, voice, caption, length, clips: clipsReq, range } = req.body || {};
-  if (!url || !/^https?:\/\//.test(url)) {
-    return res.status(400).json({ error: "Please provide a valid video URL." });
+  const { url, uploadId, voiceover: voiceoverReq, voice, caption, length, clips: clipsReq, range } = req.body || {};
+
+  // Either an uploaded file (reliable) or a link (can be blocked by the source).
+  let sourceFile = null;
+  if (uploadId) {
+    const up = uploads.get(uploadId);
+    if (!up || up.userId !== user.id) {
+      return res.status(400).json({ error: "That upload has expired — please upload the file again." });
+    }
+    sourceFile = up.file;
+  } else if (!url || !/^https?:\/\//.test(url)) {
+    return res.status(400).json({ error: "Paste a video link or upload a file." });
   }
   if (!process.env.OPENAI_API_KEY) {
     return res.status(500).json({ error: "Server is missing OPENAI_API_KEY. Add it to your .env file." });
@@ -132,6 +215,7 @@ app.post("/api/clip", async (req, res) => {
       caption: chosenCaption,
       length: chosenLength,
       range: chosenRange,
+      sourceFile,
     });
     // move clips into the public folder so the browser can play/download them
     const outDir = path.join(CLIPS_DIR, id);
@@ -150,8 +234,13 @@ app.post("/api/clip", async (req, res) => {
     job.status = "done";
     // save this batch to the user's "My Reels" library
     addReels(user.id, published, url);
-    // best-effort cleanup of the temp working dir
+    // best-effort cleanup of the temp working dir (and the uploaded source)
     fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+    if (uploadId && uploads.has(uploadId)) {
+      const up = uploads.get(uploadId);
+      uploads.delete(uploadId);
+      fs.rm(up.file, { force: true }).catch(() => {});
+    }
   } catch (err) {
     job.status = "error";
     job.error = err.message;

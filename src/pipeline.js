@@ -68,7 +68,7 @@ function friendlyDownloadError(msg) {
 }
 
 // --- small helper: read a media file's duration in seconds via ffprobe ---
-function probeDurationSec(file) {
+export function probeDurationSec(file) {
   return new Promise((resolve, reject) => {
     const p = spawn("ffprobe", [
       "-v", "error",
@@ -414,7 +414,10 @@ export async function makeClips(url, log = () => {}, opts = {}) {
 
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "makeitreel-"));
   try {
-    const video = await downloadVideo(url, workDir, log);
+    // An uploaded file skips the download entirely — no YouTube involved.
+    const video = opts.sourceFile
+      ? (log("Using your uploaded video…"), opts.sourceFile)
+      : await downloadVideo(url, workDir, log);
     const segments = await transcribe(video, workDir, log, range);
     if (!segments.length) throw new Error("No speech found to transcribe.");
     const moments = await selectMoments(segments, log, maxClips, lengthPref);

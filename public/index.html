@@ -146,9 +146,35 @@
       <!-- shown when logged in -->
       <div id="toolMain" style="display:none">
         <div class="tool-meta" id="toolMeta"></div>
-        <div class="box">
-          <input id="url" type="text" placeholder="Paste a YouTube or podcast link…" />
-          <button class="btn" id="go">Make my reels</button>
+        <div class="src-tabs">
+          <button type="button" class="src-tab active" data-src="link">🔗 Paste a link</button>
+          <button type="button" class="src-tab" data-src="file">⬆️ Upload a file</button>
+        </div>
+
+        <div id="srcLink">
+          <div class="box">
+            <input id="url" type="text" placeholder="Paste a YouTube or podcast link…" />
+            <button class="btn" id="go">Make my reels</button>
+          </div>
+          <div class="src-note">Links can be blocked by the source site. Uploading always works.</div>
+        </div>
+
+        <div id="srcFile" style="display:none">
+          <div class="drop" id="dropZone">
+            <input type="file" id="fileInput" accept="video/*,audio/*" hidden>
+            <div class="drop-ic">⬆️</div>
+            <div class="drop-title">Drop your video here, or <span class="drop-browse">browse</span></div>
+            <div class="drop-sub" id="dropLimit">mp4, mov, webm, mkv, mp3, wav</div>
+          </div>
+          <div class="up-file" id="upFile" style="display:none">
+            <div class="up-row">
+              <span class="up-name" id="upName">file.mp4</span>
+              <span class="up-status" id="upStatus">Uploading…</span>
+              <button type="button" class="up-x" id="upClear" title="Remove">✕</button>
+            </div>
+            <div class="up-bar"><div class="up-fill" id="upFill"></div></div>
+          </div>
+          <button class="btn block" id="goFile" disabled>Make my reels</button>
         </div>
 
         <!-- link preview: thumbnail + title, click to play inline -->
@@ -472,6 +498,11 @@ async function initTool() {
   const sel = $("setClips");
   sel.innerHTML = Array.from({ length: max }, (_, i) => i + 1)
     .map((n) => `<option value="${n}"${n === max ? " selected" : ""}>${n} clip${n > 1 ? "s" : ""}</option>`).join("");
+
+  if (ME.plan && ME.plan.maxUploadMB) {
+    $("dropLimit").textContent = `mp4, mov, webm, mkv, mp3, wav · up to ${
+      ME.plan.maxUploadMB >= 1024 ? (ME.plan.maxUploadMB / 1024) + " GB" : ME.plan.maxUploadMB + " MB"}`;
+  }
 
   ["setClips", "setLength", "setCapStyle", "setCapPos", "setCapSize"].forEach((id) =>
     $(id).addEventListener("change", () => { renderCapPreview(); updateSetSum(); }));
@@ -828,23 +859,25 @@ function renderMeta() {
 go.addEventListener("click", start);
 urlInput.addEventListener("keydown", (e) => { if (e.key === "Enter") start(); });
 
-async function start() {
+async function start(fromUpload) {
   const url = urlInput.value.trim();
-  if (!url) { urlInput.focus(); return; }
+  if (!fromUpload && !url) { urlInput.focus(); return; }
+  if (fromUpload && !uploadId) return;
 
   // Not signed in? Remember what they set up, then send them to sign up —
   // they land back here with the link and settings restored.
   if (!ME || !ME.user) {
-    localStorage.setItem("mir_pendingUrl", url);
+    if (url) localStorage.setItem("mir_pendingUrl", url);
     localStorage.setItem("mir_pendingSettings", JSON.stringify(currentSettings()));
     location.href = "/register.html";
     return;
   }
 
   clipsEl.innerHTML = ""; logEl.textContent = ""; panel.classList.add("show");
-  spin.style.display = "inline-block"; statusText.textContent = "Starting…"; go.disabled = true;
+  spin.style.display = "inline-block"; statusText.textContent = "Starting…";
+  go.disabled = true; $("goFile").disabled = true;
 
-  const body = { url, ...currentSettings() };
+  const body = fromUpload ? { uploadId, ...currentSettings() } : { url, ...currentSettings() };
 
   let jobId;
   try {
@@ -871,7 +904,7 @@ async function poll(jobId) {
     } else if (d.status === "done") {
       spin.style.display = "none";
       statusText.textContent = "✅ " + d.clips.length + " clips ready!";
-      go.disabled = false;
+      go.disabled = false; $("goFile").disabled = !uploadId;
       renderClips(d.clips);
       initTool(); // refresh usage counter
     } else {
@@ -904,7 +937,7 @@ function renderClips(clips) {
 function fail(msg) {
   spin.style.display = "none";
   statusText.innerHTML = '<span class="err">✕ ' + msg + '</span>';
-  go.disabled = false;
+  go.disabled = false; $("goFile").disabled = !uploadId;
 }
 
 // ---------- hero paste-bar: capture the link, funnel logged-out visitors to signup ----------
@@ -919,6 +952,112 @@ document.getElementById("heroBar").addEventListener("submit", async (e) => {
   document.getElementById("try").scrollIntoView({ behavior: "smooth" });
   loadPreview(link);
 });
+
+// ---------- file upload (the reliable source) ----------
+let uploadId = null, uploadXhr = null, localObjectUrl = null;
+
+document.querySelectorAll(".src-tab").forEach((t) => t.addEventListener("click", () => {
+  document.querySelectorAll(".src-tab").forEach((x) => x.classList.remove("active"));
+  t.classList.add("active");
+  const isFile = t.dataset.src === "file";
+  $("srcLink").style.display = isFile ? "none" : "block";
+  $("srcFile").style.display = isFile ? "block" : "none";
+  // Clear the other source so we never send both.
+  if (isFile) { urlInput.value = ""; $("preview").style.display = "none"; }
+  else clearUpload();
+}));
+
+const dropZone = $("dropZone"), fileInput = $("fileInput");
+dropZone.addEventListener("click", () => fileInput.click());
+dropZone.addEventListener("dragover", (e) => { e.preventDefault(); dropZone.classList.add("over"); });
+dropZone.addEventListener("dragleave", () => dropZone.classList.remove("over"));
+dropZone.addEventListener("drop", (e) => {
+  e.preventDefault(); dropZone.classList.remove("over");
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener("change", () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+$("upClear").addEventListener("click", clearUpload);
+
+function clearUpload() {
+  if (uploadXhr) { uploadXhr.abort(); uploadXhr = null; }
+  if (localObjectUrl) { URL.revokeObjectURL(localObjectUrl); localObjectUrl = null; }
+  uploadId = null; fileInput.value = "";
+  $("upFile").style.display = "none";
+  $("goFile").disabled = true;
+  $("preview").style.display = "none";
+  videoDuration = 0; lastDuration = 0; rangeSel = null;
+}
+
+function handleFile(file) {
+  clearUpload();
+  $("upFile").style.display = "block";
+  $("upName").textContent = file.name;
+  $("upStatus").textContent = "Uploading… 0%";
+  $("upFill").style.width = "0%";
+
+  // Show a local preview + the interval picker immediately — no waiting for
+  // the upload, since the browser can read the file directly.
+  localObjectUrl = URL.createObjectURL(file);
+  showLocalPreview(localObjectUrl, file.name);
+
+  uploadXhr = new XMLHttpRequest();
+  uploadXhr.open("POST", "/api/upload?name=" + encodeURIComponent(file.name));
+  uploadXhr.upload.onprogress = (e) => {
+    if (!e.lengthComputable) return;
+    const pct = Math.round((e.loaded / e.total) * 100);
+    $("upFill").style.width = pct + "%";
+    $("upStatus").textContent = `Uploading… ${pct}%`;
+  };
+  const xhr = uploadXhr;
+  xhr.onload = () => {
+    uploadXhr = null;
+    let d = {};
+    try { d = JSON.parse(xhr.responseText || "{}"); } catch (_) {}
+    if (xhr.status >= 200 && xhr.status < 300 && d.uploadId) {
+      uploadId = d.uploadId;
+      $("upFill").style.width = "100%";
+      $("upStatus").textContent = "✓ Ready";
+      $("upStatus").classList.add("ok");
+      $("goFile").disabled = false;
+      if (d.duration && !videoDuration) { videoDuration = d.duration; lastDuration = d.duration; setupRange(); }
+    } else {
+      $("upStatus").textContent = d.error || "Upload failed";
+      $("upStatus").classList.add("err");
+    }
+  };
+  xhr.onerror = () => { uploadXhr = null; $("upStatus").textContent = "Upload failed"; $("upStatus").classList.add("err"); };
+  xhr.send(file);
+}
+
+// Preview an uploaded file with the same stage + interval picker.
+function showLocalPreview(objUrl, name) {
+  const pv = $("preview");
+  currentYtId = null; ytPlayer = null; videoDuration = 0; lastDuration = 0; rangeSel = null;
+  $("pvStage").classList.add("playing");
+  $("pvStage").innerHTML = `<video id="localVideo" src="${objUrl}" controls preload="metadata"
+      style="width:100%;height:100%;object-fit:contain;background:#000"></video>`;
+  $("pvTitle").textContent = name;
+  $("pvAuthor").textContent = "Your upload";
+  pv.style.display = "block";
+
+  const v = document.getElementById("localVideo");
+  v.addEventListener("loadedmetadata", () => {
+    if (v.duration && isFinite(v.duration)) {
+      videoDuration = v.duration; lastDuration = v.duration;
+      setupRange();
+    }
+  });
+  // Keep the playhead marker in sync with the local player.
+  clearInterval(playheadTimer);
+  playheadTimer = setInterval(() => {
+    if (!videoDuration || !v.duration) return;
+    const ph = $("rgPlayhead");
+    ph.style.left = Math.min(100, Math.max(0, (v.currentTime / videoDuration) * 100)) + "%";
+    ph.style.display = "block";
+  }, 500);
+}
+
+$("goFile").addEventListener("click", () => start(true));
 
 initTool();
 </script>
