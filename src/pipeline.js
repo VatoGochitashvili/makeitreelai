@@ -63,9 +63,10 @@ function ytdlpCommon() {
 // Turn yt-dlp's bot-block errors into something the user can act on.
 function friendlyDownloadError(msg) {
   if (/Sign in to confirm|not a bot|429|Too Many Requests|cookies/i.test(msg)) {
-    return "YouTube is blocking downloads from this server (bot / rate-limit check). " +
-      "This is common on cloud hosts. Add YouTube cookies (YTDLP_COOKIES) or a residential " +
-      "proxy (YTDLP_PROXY) — see the README. It usually works fine from a home connection.";
+    return "YouTube is blocking this download (it does that to servers, not to you). " +
+      "Try one of these instead — they can't be blocked: upload the file directly " +
+      "(if it's your own video, download it from YouTube Studio first), paste a podcast " +
+      "RSS feed, or use a Google Drive / Dropbox share link.";
   }
   return msg;
 }
