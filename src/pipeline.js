@@ -195,19 +195,39 @@ async function downloadVideo(rawUrl, workDir, log) {
 
   log("Downloading video…");
   const out = path.join(workDir, "source.mp4");
-  // -f best mp4, limit to 1080p to keep files sane
-  try {
-    await run("yt-dlp", [
+
+  // YouTube blocks its player clients unevenly — one often works when others
+  // are refused, so try them in turn instead of giving up after the default.
+  // Ordered cheapest/most-likely first.
+  const clients = (process.env.YTDLP_CLIENTS
+    || "default,tv,ios,mweb,web_embedded,tv_embedded,android")
+    .split(",").map((c) => c.trim()).filter(Boolean);
+
+  let lastErr;
+  for (const client of clients) {
+    const args = [
       ...ytdlpCommon(),
       "-f", "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
       "--merge-output-format", "mp4",
       "-o", out,
       url,
-    ], { onLog: (l) => log(l.trim()) });
-  } catch (err) {
-    throw new Error(friendlyDownloadError(err.message));
+    ];
+    if (client !== "default") args.push("--extractor-args", `youtube:player_client=${client}`);
+
+    try {
+      await run("yt-dlp", args, { onLog: (l) => log(l.trim()) });
+      if (client !== "default") log(`(succeeded using the "${client}" player)`);
+      return out;
+    } catch (err) {
+      lastErr = err;
+      // Only worth retrying when we were blocked/refused; a genuinely missing
+      // or private video will fail the same way on every client.
+      if (!/Sign in to confirm|not a bot|429|Too Many Requests|Requested format|unable to download|403/i.test(err.message)) break;
+      await fs.rm(out, { force: true }).catch(() => {});
+      log(`"${client}" player was blocked — trying another…`);
+    }
   }
-  return out;
+  throw new Error(friendlyDownloadError(lastErr ? lastErr.message : "Download failed."));
 }
 
 // --- 2. transcribe with timestamps (Whisper) ---
