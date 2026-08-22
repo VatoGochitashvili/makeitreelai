@@ -8,3 +8,8 @@ work/
 
 # generated clip files
 public/clips/
+
+# YouTube cookies = a live login session. Never commit these.
+cookies*.txt
+*cookies.txt
+yt-cookies*
