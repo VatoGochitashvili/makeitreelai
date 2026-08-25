@@ -240,6 +240,42 @@ async function downloadVideo(rawUrl, workDir, log) {
   throw new Error(friendlyDownloadError(lastErr ? lastErr.message : "Download failed."));
 }
 
+// Bandwidth is the dominant cost when downloading through a proxy, and we
+// don't need the whole video: transcription only needs audio, and only the
+// chosen moments need pictures. So for link sources we fetch audio first,
+// then just the seconds the AI picked — typically ~90% less data.
+async function downloadAudioOnly(url, workDir, log, range) {
+  log("Downloading audio for analysis…");
+  const out = path.join(workDir, "analysis.m4a");
+  const args = [
+    ...ytdlpCommon(),
+    "-f", "bestaudio[ext=m4a]/bestaudio/best",
+    "-o", out,
+  ];
+  if (range) args.push("--download-sections", `*${Math.floor(range.start)}-${Math.ceil(range.end)}`);
+  args.push(url);
+  await run("yt-dlp", args, { onLog: (l) => log(l.trim()) });
+  const mb = ((await fs.stat(out)).size / 1e6).toFixed(1);
+  log(`Audio downloaded (${mb} MB).`);
+  return out;
+}
+
+// Fetch just one moment as video. Returns the local file for that section.
+async function downloadSection(url, workDir, log, start, end, index) {
+  const out = path.join(workDir, `sec_${index + 1}.mp4`);
+  const args = [
+    ...ytdlpCommon(),
+    "-f", "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+    "--download-sections", `*${Math.floor(start)}-${Math.ceil(end)}`,
+    "--force-keyframes-at-cuts",
+    "--merge-output-format", "mp4",
+    "-o", out,
+    url,
+  ];
+  await run("yt-dlp", args);
+  return out;
+}
+
 // --- 2. transcribe with timestamps (Whisper) ---
 async function transcribe(videoPath, workDir, log, range = null) {
   // Only transcribe the slice the user selected — cheaper, and it keeps every
@@ -537,16 +573,41 @@ export async function makeClips(url, log = () => {}, opts = {}) {
 
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "makeitreel-"));
   try {
-    // An uploaded file skips the download entirely — no YouTube involved.
     progress("download", 5);
-    const video = opts.sourceFile
-      ? (log("Using your uploaded video…"), opts.sourceFile)
-      : await downloadVideo(url, workDir, log);
-    const isAudioOnly = !(await hasVideoStream(video));
+
+    // Two-phase for link sources: grab audio now, and only the chosen moments
+    // as video later. Uploads and direct media are already cheap/local, so they
+    // keep the simple whole-file path.
+    const normalized = opts.sourceFile ? null : normalizeUrl(url).url;
+    const twoPhase = !opts.sourceFile && normalized && !isDirectMedia(normalized);
+
+    let video = null;      // full media, when we have it
+    let analysisFile;      // what we transcribe
+
+    if (opts.sourceFile) {
+      log("Using your uploaded video…");
+      video = analysisFile = opts.sourceFile;
+    } else if (twoPhase) {
+      analysisFile = await downloadAudioOnly(url, workDir, log, range);
+    } else {
+      video = analysisFile = await downloadVideo(url, workDir, log);
+    }
+
+    // Whole-file sources may be audio-only (podcasts) -> audiogram rendering.
+    // In two-phase mode we fetch real video per section, so it's never audio-only.
+    const isAudioOnly = twoPhase ? false : !(await hasVideoStream(video));
     if (isAudioOnly) log("Audio-only source — clips will be rendered as audiograms.");
 
     progress("transcribe", 30);
-    const segments = await transcribe(video, workDir, log, range);
+    // The audio we downloaded is already trimmed to the range, so don't trim twice;
+    // shift its timestamps back onto the source timeline instead.
+    const segments = twoPhase
+      ? (await transcribe(analysisFile, workDir, log, null)).map((x) => ({
+          ...x,
+          start: x.start + (range ? range.start : 0),
+          end: x.end + (range ? range.start : 0),
+        }))
+      : await transcribe(analysisFile, workDir, log, range);
     if (!segments.length) throw new Error("No speech found to transcribe.");
     progress("moments", 60);
     const moments = await selectMoments(segments, log, maxClips, lengthPref);
@@ -556,9 +617,18 @@ export async function makeClips(url, log = () => {}, opts = {}) {
       progress("render", 70 + Math.round((i / Math.max(1, moments.length)) * 28), {
         current: i + 1, total: moments.length,
       });
-      let file = isAudioOnly
-        ? await cutAudiogram(video, moments[i], i, workDir, resolution, caption, log)
-        : await cutClip(video, moments[i], i, workDir, resolution, caption, log);
+      let file;
+      if (twoPhase) {
+        // Fetch only these seconds, then cut from the start of that section.
+        log(`Fetching clip ${i + 1} of ${moments.length} from the source…`);
+        const sec = await downloadSection(url, workDir, log, moments[i].start, moments[i].end, i);
+        const local = { ...moments[i], start: 0, end: Math.max(1, moments[i].end - moments[i].start) };
+        file = await cutClip(sec, local, i, workDir, resolution, caption, log);
+      } else if (isAudioOnly) {
+        file = await cutAudiogram(video, moments[i], i, workDir, resolution, caption, log);
+      } else {
+        file = await cutClip(video, moments[i], i, workDir, resolution, caption, log);
+      }
       let narrated = false;
       if (wantVoiceover) {
         try {
