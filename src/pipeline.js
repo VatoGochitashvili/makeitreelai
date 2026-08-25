@@ -50,14 +50,24 @@ function run(cmd, args, { onLog } = {}) {
 //   YTDLP_COOKIES     - path to a cookies.txt file
 //   YTDLP_PROXY       - http/https/socks proxy URL
 //   YTDLP_ARGS        - any extra raw args (space-separated)
-function ytdlpCommon() {
+function ytdlpCommon(session) {
   const args = ["--no-warnings", "--retries", "5", "--extractor-retries", "5", "--sleep-requests", "1"];
   if (process.env.YTDLP_COOKIES && existsSync(process.env.YTDLP_COOKIES)) {
     args.push("--cookies", process.env.YTDLP_COOKIES);
   }
-  if (process.env.YTDLP_PROXY) args.push("--proxy", process.env.YTDLP_PROXY);
+  if (process.env.YTDLP_PROXY) args.push("--proxy", resolveProxy(session));
   if (process.env.YTDLP_ARGS) args.push(...process.env.YTDLP_ARGS.split(" ").filter(Boolean));
   return args;
+}
+
+// Residential providers hand out a new IP per "session id". Put {session}
+// anywhere in YTDLP_PROXY (IPRoyal, for example, takes it in the password:
+// user:pass_country-us_session-{session}_lifetime-30m) and each retry gets a
+// fresh IP instead of hammering the one that just got blocked.
+function resolveProxy(session) {
+  const raw = process.env.YTDLP_PROXY || "";
+  if (!raw.includes("{session}")) return raw;
+  return raw.replace(/\{session\}/g, session || Math.random().toString(36).slice(2, 10));
 }
 
 // Turn yt-dlp's bot-block errors into something the user can act on.
