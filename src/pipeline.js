@@ -163,9 +163,11 @@ async function transcribeFile(file) {
     file: createReadStream(file),
     model: "whisper-1",
     response_format: "verbose_json",
-    timestamp_granularities: ["segment"],
+    // Word timings are what make animated, karaoke-style captions possible.
+    // Same call, same cost — we just ask for more detail.
+    timestamp_granularities: ["segment", "word"],
   });
-  return res.segments || [];
+  return { segments: res.segments || [], words: res.words || [] };
 }
 
 // Fetch source metadata (title, duration, thumbnail) without downloading the
@@ -296,12 +298,13 @@ async function transcribe(videoPath, workDir, log, range = null) {
   extract.push("-i", videoPath, "-vn", "-ac", "1", "-ar", "16000", "-b:a", "64k", audio);
   await run("ffmpeg", extract);
 
-  const shift = (segs) => (offset ? segs.map((x) => ({ ...x, start: x.start + offset, end: x.end + offset })) : segs);
+  const shift = (arr) => (offset ? arr.map((x) => ({ ...x, start: x.start + offset, end: x.end + offset })) : arr);
   const size = (await fs.stat(audio)).size;
 
   // Short enough for a single upload.
   if (size <= WHISPER_LIMIT_BYTES) {
-    return shift(await transcribeFile(audio)); // [{ start, end, text }, ...]
+    const r = await transcribeFile(audio);
+    return { segments: shift(r.segments), words: shift(r.words) };
   }
 
   // Long podcasts exceed Whisper's 25MB limit — split into time chunks,
@@ -310,7 +313,7 @@ async function transcribe(videoPath, workDir, log, range = null) {
   const nChunks = Math.ceil(dur / TRANSCRIBE_CHUNK_SEC);
   log(`Audio is ${(size / 1e6).toFixed(0)}MB (over Whisper's 25MB limit) — transcribing in ${nChunks} chunks…`);
 
-  const segments = [];
+  const segments = [], words = [];
   for (let i = 0; i < nChunks; i++) {
     const start = i * TRANSCRIBE_CHUNK_SEC;
     const chunk = path.join(workDir, `chunk_${i}.mp3`);
@@ -321,12 +324,11 @@ async function transcribe(videoPath, workDir, log, range = null) {
     if ((await fs.stat(chunk)).size < 3000) continue;
 
     log(`  transcribing chunk ${i + 1}/${nChunks}…`);
-    const segs = await transcribeFile(chunk);
-    for (const s of segs) {
-      segments.push({ ...s, start: s.start + start, end: s.end + start });
-    }
+    const r = await transcribeFile(chunk);
+    for (const x of r.segments) segments.push({ ...x, start: x.start + start, end: x.end + start });
+    for (const w of r.words) words.push({ ...w, start: w.start + start, end: w.end + start });
   }
-  return shift(segments);
+  return { segments: shift(segments), words: shift(words) };
 }
 
 // Clip-length presets the user can pick before generating.
@@ -375,6 +377,84 @@ ${transcript}`;
     .slice(0, maxClips);
   log(`AI selected ${clips.length} moments.`);
   return clips;
+}
+
+// Does this ffmpeg know how to burn .ass subtitles? (needs libass)
+let _libass;
+function hasSubtitles() {
+  if (_libass !== undefined) return Promise.resolve(_libass);
+  return new Promise((resolve) => {
+    const p = spawn("ffmpeg", ["-hide_banner", "-filters"]);
+    let out = "";
+    p.stdout.on("data", (d) => (out += d.toString()));
+    p.on("error", () => resolve((_libass = false)));
+    p.on("close", () => resolve((_libass = /\bsubtitles\b/.test(out))));
+  });
+}
+
+function assTime(sec) {
+  const t = Math.max(0, sec);
+  const h = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const s = (t % 60).toFixed(2).padStart(5, "0");
+  return `${h}:${String(m).padStart(2, "0")}:${s}`;
+}
+
+// Animated captions: show 2-3 words at a time, timed to when they're spoken.
+// This is what makes clips read as "professionally captioned" rather than
+// carrying one static title.
+function buildAss(words, { W, H, style, position, size }) {
+  const sizeScale = { small: 0.8, medium: 1, large: 1.25 }[size] || 1;
+  const fontSize = Math.round((W / 13) * sizeScale);
+
+  // Colours are ASS &HBBGGRR (note: blue-green-red order).
+  const looks = {
+    bold:      { primary: "&H00FFFFFF", outline: "&H00000000", back: "&H00000000", border: 3, shadow: 2, boxed: 0 },
+    highlight: { primary: "&H000D0705", outline: "&H00BEF264", back: "&H00BEF264", border: 4, shadow: 0, boxed: 3 },
+    minimal:   { primary: "&H00FFFFFF", outline: "&H00000000", back: "&H00000000", border: 2, shadow: 3, boxed: 0 },
+  };
+  const look = looks[style] || looks.bold;
+
+  // 2 = bottom-centre, 5 = middle, 8 = top-centre
+  const align = position === "top" ? 8 : position === "center" ? 5 : 2;
+  const vMargin = Math.round(H * (position === "center" ? 0.05 : 0.12));
+
+  const header = [
+    "[Script Info]",
+    "ScriptType: v4.00+",
+    `PlayResX: ${W}`,
+    `PlayResY: ${H}`,
+    "WrapStyle: 2",
+    "ScaledBorderAndShadow: yes",
+    "",
+    "[V4+ Styles]",
+    "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+    `Style: Cap,DejaVu Sans,${fontSize},${look.primary},${look.primary},${look.outline},${look.back},-1,0,0,0,100,100,0,0,${look.boxed ? 3 : 1},${look.border},${look.shadow},${align},60,60,${vMargin},1`,
+    "",
+    "[Events]",
+    "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+  ].join("\n");
+
+  // Group words into short phrases, breaking on natural pauses.
+  const lines = [];
+  let group = [];
+  const flush = () => {
+    if (!group.length) return;
+    const start = group[0].start;
+    const end = group[group.length - 1].end;
+    const text = group.map((w) => w.word.trim()).join(" ").toUpperCase()
+      .replace(/[{}\\]/g, "");   // ASS control chars
+    lines.push(`Dialogue: 0,${assTime(start)},${assTime(end)},Cap,,0,0,0,,${text}`);
+    group = [];
+  };
+  for (let i = 0; i < words.length; i++) {
+    group.push(words[i]);
+    const next = words[i + 1];
+    const gap = next ? next.start - words[i].end : 0;
+    const long = group.map((w) => w.word).join(" ").length > 18;
+    if (group.length >= 3 || long || gap > 0.35 || !next) flush();
+  }
+  return header + "\n" + lines.join("\n") + "\n";
 }
 
 // 9:16 dimensions for a given target resolution (long edge height).
@@ -451,7 +531,7 @@ async function cutAudiogram(srcPath, clip, index, workDir, resolution, caption, 
   return out;
 }
 
-async function cutClip(videoPath, clip, index, workDir, resolution, caption, log) {
+async function cutClip(videoPath, clip, index, workDir, resolution, caption, log, words) {
   const out = path.join(workDir, `clip_${index + 1}.mp4`);
   const dur = Math.max(1, clip.end - clip.start);
   const { W, H } = dims(resolution);
@@ -473,9 +553,32 @@ async function cutClip(videoPath, clip, index, workDir, resolution, caption, log
     `scale=${W}:${H}:force_original_aspect_ratio=increase`,
     `crop=${W}:${H}`,
   ];
-  if (style.draw && await hasDrawtext()) {
+  // Preferred: animated word-timed captions burned from an .ass file.
+  let assPath = null;
+  if (style.draw && words && words.length && await hasSubtitles()) {
+    // Words for this clip, shifted so the clip starts at 0.
+    const local = words
+      .filter((w) => w.end > clip.start && w.start < clip.end)
+      .map((w) => ({
+        word: w.word,
+        start: Math.max(0, w.start - clip.start),
+        end: Math.max(0.1, w.end - clip.start),
+      }));
+    if (local.length) {
+      assPath = path.join(workDir, `cap_${index + 1}.ass`);
+      await fs.writeFile(assPath, buildAss(local, {
+        W, H, style: caption?.style, position: caption?.position, size: caption?.size,
+      }));
+      // ffmpeg needs the path escaped inside the filter string
+      const esc = assPath.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
+      filters.push(`subtitles='${esc}'`);
+      if (index === 0) log("Burning animated word-by-word captions…");
+    }
+  }
+
+  if (!assPath && style.draw && await hasDrawtext()) {
     filters.push(`drawtext=text='${title}':${style.draw(fontsize)}:x=(w-text_w)/2:y=${yPos}:line_spacing=8`);
-  } else if (style.draw && index === 0) {
+  } else if (!assPath && style.draw && index === 0) {
     log("Note: this ffmpeg build has no 'drawtext' filter — clips will render without burned-in captions.");
   }
   const vf = filters.join(",");
@@ -487,9 +590,13 @@ async function cutClip(videoPath, clip, index, workDir, resolution, caption, log
     "-i", videoPath,
     "-t", String(dur),
     "-vf", vf,
-    "-r", "30", "-pix_fmt", "yuv420p",
-    "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-    "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
+    // Keep the source frame rate (a 50/60fps source stays smooth) and encode
+    // at higher quality — social platforms re-compress, so we upload clean.
+    "-pix_fmt", "yuv420p",
+    "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-maxrate", "16M", "-bufsize", "24M",
+    "-profile:v", "high", "-level", "4.2",
+    "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
+    "-movflags", "+faststart",
     out,
   ]);
   return out;
@@ -601,13 +708,17 @@ export async function makeClips(url, log = () => {}, opts = {}) {
     progress("transcribe", 30);
     // The audio we downloaded is already trimmed to the range, so don't trim twice;
     // shift its timestamps back onto the source timeline instead.
-    const segments = twoPhase
-      ? (await transcribe(analysisFile, workDir, log, null)).map((x) => ({
-          ...x,
-          start: x.start + (range ? range.start : 0),
-          end: x.end + (range ? range.start : 0),
-        }))
-      : await transcribe(analysisFile, workDir, log, range);
+    let segments, words;
+    if (twoPhase) {
+      // Audio was already trimmed to the range; shift back onto the source timeline.
+      const off = range ? range.start : 0;
+      const r = await transcribe(analysisFile, workDir, log, null);
+      segments = r.segments.map((x) => ({ ...x, start: x.start + off, end: x.end + off }));
+      words = r.words.map((x) => ({ ...x, start: x.start + off, end: x.end + off }));
+    } else {
+      const r = await transcribe(analysisFile, workDir, log, range);
+      segments = r.segments; words = r.words;
+    }
     if (!segments.length) throw new Error("No speech found to transcribe.");
     progress("moments", 60);
     const moments = await selectMoments(segments, log, maxClips, lengthPref);
@@ -623,11 +734,13 @@ export async function makeClips(url, log = () => {}, opts = {}) {
         log(`Fetching clip ${i + 1} of ${moments.length} from the source…`);
         const sec = await downloadSection(url, workDir, log, moments[i].start, moments[i].end, i);
         const local = { ...moments[i], start: 0, end: Math.max(1, moments[i].end - moments[i].start) };
-        file = await cutClip(sec, local, i, workDir, resolution, caption, log);
+        file = await cutClip(sec, local, i, workDir, resolution, caption, log,
+          // shift words to be relative to this section
+          words.map((w) => ({ ...w, start: w.start - moments[i].start, end: w.end - moments[i].start })));
       } else if (isAudioOnly) {
         file = await cutAudiogram(video, moments[i], i, workDir, resolution, caption, log);
       } else {
-        file = await cutClip(video, moments[i], i, workDir, resolution, caption, log);
+        file = await cutClip(video, moments[i], i, workDir, resolution, caption, log, words);
       }
       let narrated = false;
       if (wantVoiceover) {
