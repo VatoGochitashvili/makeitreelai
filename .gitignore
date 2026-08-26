@@ -13,3 +13,5 @@ public/clips/
 cookies*.txt
 *cookies.txt
 yt-cookies*
+assets/backgrounds/*
+!assets/backgrounds/README.md

@@ -34,7 +34,7 @@ async function deleteClipFile(url) {
   return freed;
 }
 
-const library = readJSON("reels.json", {}); // userId -> [ { id, url, title, hook, virality, narrated, sourceUrl, createdAt } ]
+const library = readJSON("reels.json", {}); // userId -> [ { id, url, title, hook, virality, narrated, format, sourceUrl, createdAt } ]
 function persist() { writeJSON("reels.json", () => library); }
 
 // Save a finished batch of clips to a user's library.
@@ -47,6 +47,7 @@ export function addReels(userId, clips, sourceUrl) {
       id: randomUUID(),
       url: c.url, title: c.title, hook: c.hook,
       virality: c.virality, narrated: !!c.narrated,
+      format: c.format || "clip",
       sourceUrl: sourceUrl || null, createdAt: now,
     });
   }

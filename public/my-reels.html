@@ -79,6 +79,8 @@ async function load() {
         <div class="badges">
           ${c.virality != null ? `<span class="v">🔥 ${c.virality}</span>` : ""}
           ${c.narrated ? `<span class="v narr">🎙️ Narrated</span>` : ""}
+          ${c.format === "split" ? `<span class="v fmt">🎮 Split screen</span>` : ""}
+          ${c.format === "brainrot" ? `<span class="v fmt">🎮 Brainrot</span>` : ""}
         </div>
         <div class="t">${c.title || "Clip"}</div>
         <div class="clip-date">${new Date(c.createdAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}</div>

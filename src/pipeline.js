@@ -836,7 +836,7 @@ async function cutAudiogram(srcPath, clip, index, workDir, resolution, caption, 
     .replace(/'/g, "’").replace(/:/g, " ").slice(0, 60)
     .replace(/(.{1,20})(\s+|$)/g, "$1\n").trim();
 
-  log(`Rendering audiogram ${index + 1} @${H}p: "${clip.title || "untitled"}"…`);
+  log(`Rendering audiogram ${index + 1} @${W}p: "${clip.title || "untitled"}"…`);
 
   // background colour + waveform strip drawn over it, then the title text
   const waveH = Math.round(H * 0.26);
@@ -961,7 +961,7 @@ async function cutClip(videoPath, clip, index, workDir, resolution, caption, log
   }
   const vf = filters.join(",");
 
-  log(`Cutting clip ${index + 1} @${H}p: "${clip.title || "untitled"}"…`);
+  log(`Cutting clip ${index + 1} @${W}p: "${clip.title || "untitled"}"…`);
   await run(FFMPEG, [
     "-y",
     "-ss", String(clip.start),
@@ -1046,6 +1046,194 @@ async function addNarratedIntro(baseClip, clip, index, workDir, resolution, voic
   return final;
 }
 
+// --- 4c. "Brainrot" formats: gameplay footage under a narrated script ---
+//
+// The format that took over TikTok: a wall of Minecraft parkour or Fortnite
+// while a synthetic voice reads the story, every word captioned. It works
+// because the gameplay holds the eye while the words do the work.
+//
+// Two variants:
+//   split    - the real clip on top, gameplay underneath, original audio
+//   brainrot - gameplay fills the frame, AI voice reads a rewritten script
+
+export const FORMATS = {
+  clip:     { key: "clip",     label: "Standard clip", needsBackground: false, narrated: false },
+  split:    { key: "split",    label: "Split screen — clip over gameplay", needsBackground: true, narrated: false },
+  brainrot: { key: "brainrot", label: "Brainrot — gameplay + AI narration", needsBackground: true, narrated: true },
+};
+
+// The transcript of one moment, as plain prose.
+export function textFor(segments, start, end) {
+  return segments
+    .filter((sg) => sg.end > start && sg.start < end)
+    .map((sg) => sg.text.trim())
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Rewrite a moment as something a synthetic voice can read: spoken register,
+// a hook in the first line, no "um", no references to a video the viewer
+// hasn't seen. Kept close to the source so it stays the speaker's point
+// rather than the model's invention.
+async function narrationScript(moment, sourceText, log) {
+  const seconds = Math.max(8, Math.round(moment.end - moment.start));
+  // ~2.6 words/second is a comfortable pace for TTS.
+  const words = Math.round(seconds * 2.6);
+
+  const prompt = `Rewrite this excerpt as a script to be read aloud over a short vertical video.
+
+Rules:
+- Open with a hook in the first sentence that makes someone stop scrolling.
+- Keep the speaker's actual point and facts. Do not invent details.
+- Spoken register: short sentences, plain words, no bullet points, no headings.
+- Strip filler ("um", "you know", "like"), false starts and cross-talk.
+- No stage directions, no emoji, no "in this video", no sign-off.
+- About ${words} words — it has to be readable in ${seconds} seconds.
+
+Return ONLY valid JSON: {"script":"<the script>","title":"<max 8 words>"}
+
+Excerpt:
+${sourceText.slice(0, 6000)}`;
+
+  const t0 = Date.now();
+  aiLog(`  🤖 GPT (gpt-4o-mini): writing a ${words}-word narration script…`);
+  throwIfCancelled();
+  const completion = await openai().chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: prompt }],
+    response_format: { type: "json_object" },
+    temperature: 0.7,
+  }, { signal: ctx()?.signal });
+
+  const u = completion.usage || {};
+  aiLog(`  🤖 GPT done in ${((Date.now() - t0) / 1000).toFixed(1)}s — ` +
+        `~$${(((u.prompt_tokens || 0) / 1000) * PRICE.gptInPer1k +
+              ((u.completion_tokens || 0) / 1000) * PRICE.gptOutPer1k).toFixed(4)}`);
+
+  let data = {};
+  try { data = JSON.parse(completion.choices[0].message.content); } catch { /* fall through */ }
+  const script = (data.script || "").trim();
+  if (!script) throw new Error("The AI returned an empty narration script.");
+  return { script, title: (data.title || moment.title || "").trim() };
+}
+
+// Speak the script, then transcribe what we just spoke.
+//
+// Sending the TTS audio back through Whisper looks circular, but it's the only
+// way to caption narration word-by-word: we know the text, not when each word
+// lands. Whisper on a clean synthetic voice is close to exact, and a minute of
+// audio costs well under a cent.
+async function speechWithWordTimings(text, voice, workDir, index, log) {
+  const mp3 = path.join(workDir, `narration_${index + 1}.mp3`);
+  await fs.writeFile(mp3, await synthSpeech(text, voice));
+  const seconds = await probeDurationSec(mp3);
+  log(`  narration is ${seconds.toFixed(1)}s — timing the captions…`);
+  let words = [];
+  try {
+    ({ words } = await transcribeFile(mp3));
+  } catch (e) {
+    if (e instanceof Cancelled) throw e;
+    log(`  couldn't time the captions (${e.message}) — the clip will run without them.`);
+  }
+  return { file: mp3, seconds, words: words || [] };
+}
+
+// Start somewhere random in the background footage so ten clips from one run
+// don't all open on the same frame. Leaves room for the clip to play out.
+function backgroundOffset(bgDuration, needSec) {
+  if (!bgDuration || bgDuration <= needSec + 1) return 0;
+  return +(Math.random() * (bgDuration - needSec - 1)).toFixed(2);
+}
+
+// Write the .ass for a set of words that already start at 0.
+async function writeCaptions(words, workDir, index, W, H, caption) {
+  if (!words || !words.length || !(await hasSubtitles())) return null;
+  const assPath = path.join(workDir, `cap_${index + 1}.ass`);
+  await fs.writeFile(assPath, buildAss(words, {
+    W, H, style: caption?.style, position: caption?.position, size: caption?.size,
+  }));
+  return assPath.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
+}
+
+// Split screen: the real clip on top, gameplay below, original audio.
+async function cutSplit(videoPath, clip, index, workDir, resolution, caption, log, words, background, subjectX = null) {
+  const out = path.join(workDir, `clip_${index + 1}.mp4`);
+  const dur = Math.max(1, clip.end - clip.start);
+  const { W, H } = dims(resolution);
+  const half = Math.round(H / 2 / 2) * 2;   // even height, or x264 refuses
+
+  // Frame the top half on the speaker, same as a standard clip.
+  let cropTop = `crop=${W}:${half}`;
+  if (subjectX != null) {
+    const d = await probeDims(videoPath);
+    if (d) {
+      const f = Math.max(W / d.w, half / d.h);
+      const scaledW = Math.round(d.w * f);
+      const target = 0.5 + (subjectX - 0.5) * 0.85;
+      const xOff = Math.round(Math.min(Math.max(scaledW * target - W / 2, 0), Math.max(0, scaledW - W)));
+      cropTop = `crop=${W}:${half}:${xOff}:0`;
+    }
+  }
+
+  const local = (words || [])
+    .filter((w) => w.end > clip.start && w.start < clip.end)
+    .map((w) => ({ word: w.word, start: Math.max(0, w.start - clip.start), end: Math.max(0.1, w.end - clip.start) }));
+  const esc = await writeCaptions(local, workDir, index, W, H, caption);
+
+  const chain = [
+    `[0:v]scale=${W}:${half}:force_original_aspect_ratio=increase,${cropTop},setsar=1[top]`,
+    `[1:v]scale=${W}:${half}:force_original_aspect_ratio=increase,crop=${W}:${half},setsar=1[bot]`,
+    `[top][bot]vstack=inputs=2[st]`,
+    esc ? `[st]subtitles='${esc}'[v]` : `[st]null[v]`,
+  ];
+
+  log(`Cutting clip ${index + 1} @${W}p over "${background.name}"…`);
+  await run(FFMPEG, [
+    "-y",
+    "-ss", String(clip.start), "-i", videoPath,
+    "-stream_loop", "-1", "-ss", String(backgroundOffset(background.duration, dur)), "-i", background.file,
+    "-t", String(dur),
+    "-filter_complex", chain.join(";"),
+    "-map", "[v]", "-map", "0:a",
+    "-pix_fmt", "yuv420p",
+    "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-maxrate", "16M", "-bufsize", "24M",
+    "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
+    "-movflags", "+faststart",
+    out,
+  ]);
+  return out;
+}
+
+// Brainrot: gameplay fills the frame, an AI voice reads the rewritten script,
+// captions land on every word. The source video is never shown.
+async function cutBrainrot(clip, index, workDir, resolution, caption, log, background, narration) {
+  const out = path.join(workDir, `clip_${index + 1}.mp4`);
+  const { W, H } = dims(resolution);
+
+  const esc = await writeCaptions(narration.words, workDir, index, W, H, caption);
+  const chain =
+    `[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1` +
+    (esc ? `,subtitles='${esc}'` : "") + `[v]`;
+
+  log(`Rendering clip ${index + 1} @${W}p — narration over "${background.name}"…`);
+  await run(FFMPEG, [
+    "-y",
+    "-stream_loop", "-1",
+    "-ss", String(backgroundOffset(background.duration, narration.seconds)), "-i", background.file,
+    "-i", narration.file,
+    "-filter_complex", chain,
+    "-map", "[v]", "-map", "1:a",
+    "-shortest",
+    "-r", "30", "-pix_fmt", "yuv420p",
+    "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-maxrate", "16M", "-bufsize", "24M",
+    "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
+    "-movflags", "+faststart",
+    out,
+  ]);
+  return out;
+}
+
 // --- orchestrator: run the whole pipeline for one URL ---
 // opts: { maxClips, resolution, voiceover, voice }
 export async function makeClips(url, log = () => {}, opts = {}) {
@@ -1058,6 +1246,14 @@ export async function makeClips(url, log = () => {}, opts = {}) {
   const range = opts.range || null; // { start, end } seconds, or null for the whole video
   const motion = ["none", "subtle", "strong"].includes(opts.motion) ? opts.motion : "subtle";
   const layout = ["crop", "fit"].includes(opts.layout) ? opts.layout : "crop";
+  // "split" and "brainrot" need gameplay footage to sit under the clip; without
+  // a background there is nothing to render, so fall back to a standard clip.
+  let format = FORMATS[opts.format] ? opts.format : "clip";
+  const background = opts.background || null;
+  if (FORMATS[format].needsBackground && !background) {
+    log("No background footage selected — rendering standard clips instead.");
+    format = "clip";
+  }
   // Reports the current phase so the UI can show a real progress bar instead
   // of raw tool output. pct is an overall 0-100 estimate.
   const progress = opts.onProgress || (() => {});
@@ -1123,31 +1319,49 @@ export async function makeClips(url, log = () => {}, opts = {}) {
       // Where is the speaker in this moment? (two-phase analyses the section
       // once it's been fetched, below — there's no full file to sample yet.)
       let subjectX = null;
-      if (layout === "crop" && !twoPhase) {
+      if (layout === "crop" && !twoPhase && format !== "brainrot") {
         subjectX = await findSubjectX(video, moments[i].start,
           moments[i].end - moments[i].start, log).catch(() => null);
       }
 
       let file;
-      if (twoPhase) {
+      if (format === "brainrot") {
+        // No source footage is shown, so there is nothing to download or crop:
+        // the transcript we already have is the whole input.
+        const source = textFor(segments, moments[i].start, moments[i].end);
+        const { script, title } = await narrationScript(moments[i], source, log);
+        if (title) moments[i].title = title;
+        const narration = await speechWithWordTimings(script, voice, workDir, i, log);
+        file = await cutBrainrot(moments[i], i, workDir, resolution, caption, log, background, narration);
+        moments[i].script = script;
+      } else if (twoPhase) {
         // Fetch only these seconds, then cut from the start of that section.
         log(`Fetching clip ${i + 1} of ${moments.length} from the source…`);
         const sec = await downloadSection(url, workDir, log, moments[i].start, moments[i].end, i);
         const local = { ...moments[i], start: 0, end: Math.max(1, moments[i].end - moments[i].start) };
-        file = await cutClip(sec, local, i, workDir, resolution, caption, log, 
-          // shift words to be relative to this section
-          words.map((w) => ({ ...w, start: w.start - moments[i].start, end: w.end - moments[i].start })),
-          motion, layout,
-          layout === "crop"
-            ? await findSubjectX(sec, 0, moments[i].end - moments[i].start, log).catch(() => null)
-            : null);
+        const localWords = words.map((w) =>
+          ({ ...w, start: w.start - moments[i].start, end: w.end - moments[i].start }));
+        // Only worth sampling when something will actually be cropped to a subject.
+        const needsSubject = format === "split" || layout === "crop";
+        const secSubject = needsSubject
+          ? await findSubjectX(sec, 0, moments[i].end - moments[i].start, log).catch(() => null)
+          : null;
+        file = format === "split"
+          ? await cutSplit(sec, local, i, workDir, resolution, caption, log, localWords, background, secSubject)
+          : await cutClip(sec, local, i, workDir, resolution, caption, log, localWords,
+                          motion, layout, layout === "crop" ? secSubject : null);
       } else if (isAudioOnly) {
+        // There is no picture to stack — an audiogram already fills the frame.
+        if (format === "split") log("  audio-only source — rendering an audiogram instead of a split screen.");
         file = await cutAudiogram(video, moments[i], i, workDir, resolution, caption, log);
+      } else if (format === "split") {
+        file = await cutSplit(video, moments[i], i, workDir, resolution, caption, log, words, background,
+          await findSubjectX(video, moments[i].start, moments[i].end - moments[i].start, log).catch(() => null));
       } else {
         file = await cutClip(video, moments[i], i, workDir, resolution, caption, log, words, motion, layout, subjectX);
       }
       let narrated = false;
-      if (wantVoiceover) {
+      if (wantVoiceover && format !== "brainrot") {
         try {
           file = await addNarratedIntro(file, moments[i], i, workDir, resolution, voice, log);
           narrated = true;
@@ -1163,7 +1377,9 @@ export async function makeClips(url, log = () => {}, opts = {}) {
         virality: moments[i].virality ?? null,
         start: moments[i].start,
         end: moments[i].end,
-        narrated,
+        narrated: narrated || format === "brainrot",
+        format,
+        script: moments[i].script || null,
       });
     }
     progress("done", 100);

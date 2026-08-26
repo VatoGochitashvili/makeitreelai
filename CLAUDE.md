@@ -14,7 +14,9 @@ Business model: monthly subscription (~$19/mo). Planned differentiator vs Opus: 
 ## Layout
 - `server.js` — Express server; routes `POST /api/clip` (start job) and `GET /api/jobs/:id` (poll status/logs/clips). In-memory job store.
 - `src/pipeline.js` — the pipeline: `makeClips(url, log)` → download → transcribe → selectMoments (GPT) → cutClip (ffmpeg). Returns clip files + metadata.
-- `public/index.html` — the app UI: paste link, poll progress, render clip players + download.
+- `public/index.html` — the marketing home + the tool (logged-out visitors can preview).
+- `public/studio.html` — the signed-in workspace; same tool, no pitch.
+- `src/backgrounds.js` — gameplay footage library for the split/brainrot formats.
 - `.env` — needs `OPENAI_API_KEY` (copy from `.env.example`).
 
 ## How to run
@@ -24,6 +26,21 @@ npm install
 npm start                 # http://localhost:3000
 ```
 Requires `ffmpeg` and `yt-dlp` on PATH (macOS: `brew install ffmpeg yt-dlp`).
+
+## Output formats
+`format` in the generate request picks how a clip is rendered:
+- `clip` — the speaker, cropped to 9:16 (default)
+- `split` — the clip on top, gameplay underneath, original audio
+- `brainrot` — gameplay fills the frame, an AI voice reads a GPT-rewritten
+  script, and the source video never appears
+
+The last two need background footage, which we can't ship (it's someone's
+copyright). Drop files in `assets/backgrounds/` for a shared library, or let
+users upload their own from the Studio — see `src/backgrounds.js`.
+
+Captioning narration works by sending the TTS audio back through Whisper: we
+know the words but not their timing, and a clean synthetic voice transcribes
+almost exactly.
 
 ## Roadmap / good next tasks
 1. **Animated word-by-word captions** — build an `.ass` subtitle file from Whisper word timestamps, burn with ffmpeg. Biggest quality win.

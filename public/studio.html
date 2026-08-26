@@ -148,6 +148,14 @@
               <select id="setClips" class="voice-select"></select>
             </div>
             <div class="set-field">
+              <label for="setFormat">Video format</label>
+              <select id="setFormat" class="voice-select">
+                <option value="clip" selected>Standard clip</option>
+                <option value="split">Split screen — clip over gameplay</option>
+                <option value="brainrot">Brainrot — gameplay + AI voice</option>
+              </select>
+            </div>
+            <div class="set-field">
               <label for="setLength">Clip length</label>
               <select id="setLength" class="voice-select">
                 <option value="auto">Auto — varied (20s–2min)</option>
@@ -202,6 +210,19 @@
             </div>
           </div>
 
+
+          <!-- only meaningful for the gameplay-backed formats -->
+          <div class="bg-picker" id="bgPicker" style="display:none">
+            <div class="bg-row">
+              <div class="set-field" style="flex:1">
+                <label for="setBackground">Background footage</label>
+                <select id="setBackground" class="voice-select"></select>
+              </div>
+              <button type="button" class="vo-sample" id="bgAdd">+ Add footage</button>
+              <input type="file" id="bgFile" accept="video/*" hidden>
+            </div>
+            <div class="bg-note" id="bgNote"></div>
+          </div>
           <div class="set-divider"></div>
 
           <div class="tool-options">
@@ -359,6 +380,7 @@ async function initTool() {
   }
 
   renderCapPreview(); updateSetSum();
+  if (signedIn) loadBackgroundList();
   if (urlInput.value.trim()) loadPreview(normalizeLink(urlInput.value));
 
   // A job keeps running on the server even if this tab was closed — pick it
@@ -384,6 +406,66 @@ async function initTool() {
 }
 
 // ---------- generation settings ----------
+// ---------- gameplay backgrounds (split screen / brainrot) ----------
+// The footage isn't ours to ship, so the library is whatever the user adds.
+let backgrounds = [];
+
+async function loadBackgroundList() {
+  try {
+    const { backgrounds: list } = await (await fetch("/api/backgrounds")).json();
+    backgrounds = list || [];
+  } catch (_) { backgrounds = []; }
+  const sel = $("setBackground");
+  const keep = sel.value;
+  sel.innerHTML = backgrounds.length
+    ? backgrounds.map((b) => `<option value="${b.id}">${b.name}${b.duration ? ` — ${fmtTime(b.duration)}` : ""}</option>`).join("")
+    : `<option value="">No footage yet — add one</option>`;
+  if (keep && backgrounds.some((b) => b.id === keep)) sel.value = keep;
+  updateBgPicker();
+}
+
+function updateBgPicker() {
+  const fmt = $("setFormat").value;
+  const needs = fmt === "split" || fmt === "brainrot";
+  $("bgPicker").style.display = needs ? "block" : "none";
+  if (!needs) return;
+  $("bgNote").textContent = backgrounds.length
+    ? (fmt === "brainrot"
+        ? "The clip's audio is replaced by an AI voice reading a rewritten script — the original video never appears."
+        : "Your clip plays on top, this footage plays underneath, and the original audio is kept.")
+    : "Add a gameplay clip you recorded or are licensed to use. It gets cropped to 9:16 and looped.";
+}
+
+$("bgAdd").addEventListener("click", () => $("bgFile").click());
+$("bgFile").addEventListener("change", async () => {
+  const f = $("bgFile").files[0];
+  if (!f) return;
+  const note = $("bgNote");
+  note.textContent = `Uploading ${f.name}…`;
+  try {
+    const res = await fetch(`/api/backgrounds?name=${encodeURIComponent(f.name)}`, { method: "POST", body: f });
+    const data = await res.json();
+    if (!res.ok) { note.textContent = data.error || "That upload failed."; return; }
+    await loadBackgroundList();
+    $("setBackground").value = data.background.id;
+    note.textContent = `Added "${data.background.name}".`;
+  } catch (e) {
+    note.textContent = "That upload failed — check the file and try again.";
+  } finally {
+    $("bgFile").value = "";
+  }
+});
+
+$("setFormat").addEventListener("change", () => {
+  updateBgPicker();
+  updateSetSum();
+  // Brainrot supplies its own narration; a second voiceover would double it.
+  const brainrot = $("setFormat").value === "brainrot";
+  voSwitch.classList.toggle("dimmed", brainrot);
+  if (brainrot) voToggle.checked = false;
+});
+$("setBackground").addEventListener("change", updateSetSum);
+
 function currentSettings() {
   const out = {
     clips: parseInt($("setClips").value, 10),
@@ -391,6 +473,8 @@ function currentSettings() {
     caption: { style: $("setCapStyle").value, position: $("setCapPos").value, size: $("setCapSize").value },
     motion: $("setMotion").value,
     layout: $("setLayout").value,
+    format: $("setFormat").value,
+    backgroundId: $("setBackground").value || null,
     voiceover: !voToggle.disabled && voToggle.checked,
     voice: voVoice.value,
   };
@@ -406,7 +490,8 @@ function updateSetSum() {
   const capLabel = { bold: "Bold", highlight: "Highlight", minimal: "Minimal", none: "No captions" }[s.caption.style];
   const lenLabel = { auto: "Auto (varied)", short: "15–30s", medium: "30–45s", long: "45–75s" }[s.length];
   const rangeLabel = s.range ? ` · ✂️ ${fmtTime(s.range.start)}–${fmtTime(s.range.end)}` : "";
-  $("setSum").textContent = `${s.clips} clip${s.clips > 1 ? "s" : ""} · ${lenLabel} · ${capLabel}${s.voiceover ? " · 🔊 Voiceover" : ""}${rangeLabel}`;
+  const fmtLabel = { clip: "", split: " · 🎮 Split screen", brainrot: " · 🎮 Brainrot" }[s.format] || "";
+  $("setSum").textContent = `${s.clips} clip${s.clips > 1 ? "s" : ""} · ${lenLabel} · ${capLabel}${fmtLabel}${s.voiceover && s.format !== "brainrot" ? " · 🔊 Voiceover" : ""}${rangeLabel}`;
 }
 
 // Live mock of how the burned-in caption will look.

@@ -4,7 +4,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
-import { makeClips, synthSpeech, probeVideoMeta, probeDurationSec, withAiLogger, withJob, Cancelled } from "./src/pipeline.js";
+import { makeClips, synthSpeech, probeVideoMeta, probeDurationSec, withAiLogger, withJob, Cancelled, FORMATS } from "./src/pipeline.js";
 import { createWriteStream } from "node:fs";
 import { authRouter, attachUser, getUsage, bumpVideoUsage, refundVideoUsage } from "./src/auth.js";
 import { schedulerRouter } from "./src/scheduler.js";
@@ -13,6 +13,7 @@ import { planOf, VOICE_IDS } from "./src/plans.js";
 import { DATA_DIR } from "./src/store.js";
 import { fetchPodcastFeed, normalizeUrl, isDirectMedia } from "./src/sources.js";
 import { workerRouter, workerEnabled, requestDownload, workerOnline } from "./src/worker-queue.js";
+import { backgroundsRouter, loadBackgrounds, findBackground, anyBackground } from "./src/backgrounds.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -32,6 +33,8 @@ app.use("/api", authRouter);
 app.use("/api", schedulerRouter);
 app.use("/api", reelsRouter);
 app.use("/api", workerRouter);
+app.use("/api", backgroundsRouter);
+await loadBackgrounds();
 
 // finished clips are served from here
 const CLIPS_DIR = path.join(__dirname, "public", "clips");
@@ -138,7 +141,8 @@ app.post("/api/clip", async (req, res) => {
   const user = req.user;
   if (!user) return res.status(401).json({ error: "Please log in to generate clips." });
 
-  const { url, uploadId, voiceover: voiceoverReq, voice, caption, length, clips: clipsReq, range, motion, layout } = req.body || {};
+  const { url, uploadId, voiceover: voiceoverReq, voice, caption, length, clips: clipsReq, range, motion, layout,
+          format, backgroundId } = req.body || {};
 
   // Accept "youtube.com/watch?v=..." the way a browser would.
   const cleanUrl = url && !/^https?:\/\//i.test(url) ? "https://" + String(url).trim() : url;
@@ -198,6 +202,28 @@ app.post("/api/clip", async (req, res) => {
   const chosenMotion = ["none", "subtle", "strong"].includes(motion) ? motion : "subtle";
   const chosenLayout = ["crop", "fit"].includes(layout) ? layout : "crop";
 
+  // Gameplay-backed formats. "brainrot" replaces the audio with a synthetic
+  // voice, so it needs the same plan capability as any other voiceover.
+  const chosenFormat = FORMATS[format] ? format : "clip";
+  if (chosenFormat === "brainrot" && !plan.voiceover) {
+    return res.status(402).json({
+      error: "Brainrot clips use an AI voice, which is a Creator/Pro feature. Upgrade to enable them.",
+      upgrade: true,
+    });
+  }
+  let background = null;
+  if (FORMATS[chosenFormat].needsBackground) {
+    background = backgroundId
+      ? findBackground(backgroundId, user.id)
+      : anyBackground(user.id);
+    if (!background) {
+      return res.status(400).json({
+        error: "That format needs gameplay footage. Add a background clip in the Studio first.",
+        needsBackground: true,
+      });
+    }
+  }
+
   // Optional [start, end] window — clips are only taken from this slice.
   let chosenRange = null;
   if (range && range.start != null && range.end != null) {
@@ -253,6 +279,8 @@ app.post("/api/clip", async (req, res) => {
       range: chosenRange,
       motion: chosenMotion,
       layout: chosenLayout,
+      format: chosenFormat,
+      background: background && { name: background.name, file: background.file, duration: background.duration },
       sourceFile,
       onProgress,
       // With a helper connected, links are fetched on the user's own machine
@@ -272,6 +300,7 @@ app.post("/api/clip", async (req, res) => {
         url: `/clips/${id}/${name}`,
         title: c.title, hook: c.hook, virality: c.virality,
         start: c.start, end: c.end, narrated: !!c.narrated,
+        format: c.format || "clip", script: c.script || null,
       });
     }
     job.clips = published;
