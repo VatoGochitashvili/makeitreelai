@@ -4,7 +4,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
-import { makeClips, synthSpeech, probeVideoMeta, probeDurationSec, setAiLogger } from "./src/pipeline.js";
+import { makeClips, synthSpeech, probeVideoMeta, probeDurationSec, withAiLogger } from "./src/pipeline.js";
 import { createWriteStream } from "node:fs";
 import { authRouter, attachUser, getUsage, bumpVideoUsage } from "./src/auth.js";
 import { schedulerRouter } from "./src/scheduler.js";
@@ -235,8 +235,8 @@ app.post("/api/clip", async (req, res) => {
   };
 
   try {
-    setAiLogger(log); // surface model calls, timings and costs in this job's log
-    const { workDir, clips } = await makeClips(cleanUrl, log, {
+    // Scope model-call logging to this job so concurrent runs don't mix.
+    const { workDir, clips } = await withAiLogger(log, () => makeClips(cleanUrl, log, {
       maxClips: chosenClips,
       resolution: plan.resolution,
       voiceover: wantVoiceover,
@@ -252,7 +252,7 @@ app.post("/api/clip", async (req, res) => {
       externalDownload: (!sourceFile && workerEnabled() && !isDirectMedia(normalizeUrl(cleanUrl).url))
         ? (u, dir, l) => requestDownload(u, dir, l)
         : null,
-    });
+    }));
     // move clips into the public folder so the browser can play/download them
     const outDir = path.join(CLIPS_DIR, id);
     await fs.mkdir(outDir, { recursive: true });

@@ -7,6 +7,7 @@
 // On Replit add them via the "System dependencies" / nix packages: yt-dlp, ffmpeg.
 
 import { spawn } from "node:child_process";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -195,8 +196,11 @@ const TRANSCRIBE_CHUNK_SEC = 15 * 60;
 // Send one audio file to Whisper and return its segments.
 // Rough public per-unit prices, only used to show what a run costs.
 const PRICE = { whisperPerMin: 0.006, gptInPer1k: 0.00015, gptOutPer1k: 0.0006, ttsPer1k: 0.015 };
-let aiLog = () => {};
-export function setAiLogger(fn) { aiLog = fn || (() => {}); }
+// One global logger meant concurrent jobs wrote into each other's logs.
+// AsyncLocalStorage scopes it to whichever job is actually running.
+const aiCtx = new AsyncLocalStorage();
+export function withAiLogger(fn, body) { return aiCtx.run({ log: fn || (() => {}) }, body); }
+function aiLog(msg) { (aiCtx.getStore()?.log || (() => {}))(msg); }
 
 async function transcribeFile(file) {
   const t0 = Date.now();

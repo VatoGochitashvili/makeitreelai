@@ -980,11 +980,15 @@ const STAGE_CEIL = { queued: 5, download: 30, transcribe: 56, moments: 60, rende
 function animateProgress() {
   clearInterval(creepTimer);
   creepTimer = setInterval(() => {
-    // ease 25% of the remaining distance each tick
-    if (shownPct < targetPct) shownPct += Math.max(0.15, (targetPct - shownPct) * 0.25);
-    else if (shownPct < targetPct + 0.01) {
-      // caught up: creep gently towards the current stage's ceiling
-      shownPct = Math.min(shownPct + 0.06, Math.max(targetPct, ceilPct - 0.5));
+    if (shownPct < targetPct) {
+      // catch up to real progress quickly
+      shownPct += Math.max(0.15, (targetPct - shownPct) * 0.25);
+    } else {
+      // Caught up and the server hasn't moved yet — keep creeping towards this
+      // stage's ceiling so a long step never looks frozen. Slows as it nears
+      // the ceiling so it can't run away from reality.
+      const room = Math.max(0, (ceilPct - 0.5) - shownPct);
+      if (room > 0.05) shownPct += Math.max(0.02, room * 0.012);
     }
     shownPct = Math.min(shownPct, 100);
     $("progFill").style.width = shownPct.toFixed(1) + "%";
