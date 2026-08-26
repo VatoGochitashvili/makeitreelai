@@ -186,6 +186,7 @@
           <div class="src-note">Podcast feeds publish episodes for download — this source is never blocked.</div>
           <div class="auth-msg" id="feedMsg"></div>
           <div class="ep-list" id="epList"></div>
+          <button class="btn block" id="goPodcast" disabled>Make my reels</button>
         </div>
 
         <!-- link preview: thumbnail + title, click to play inline -->
@@ -299,6 +300,7 @@
           </div>
         </details>
 
+        <div class="tool-hint" id="toolHint" style="display:none"></div>
         <div class="hint">Only clip videos you own or have rights to. 🔒</div>
         <div class="panel" id="panel">
           <!-- friendly progress: a bar and named steps, not raw tool output -->
@@ -898,8 +900,15 @@ urlInput.addEventListener("keydown", (e) => { if (e.key === "Enter") start(false
 
 async function start(fromUpload) {
   const url = urlInput.value.trim();
-  if (!fromUpload && !url) { urlInput.focus(); return; }
-  if (fromUpload && !uploadId) return;
+
+  // Say what's missing rather than doing nothing.
+  if (fromUpload && !uploadId) return toolHint("Choose a file first — then press Make my reels.");
+  if (!fromUpload && !url) {
+    urlInput.focus();
+    return toolHint(activeSource === "podcast"
+      ? "Pick an episode from the list first."
+      : "Paste a video link first — or switch to Upload a file.");
+  }
 
   // Not signed in? Remember what they set up, then send them to sign up —
   // they land back here with the link and settings restored.
@@ -1046,18 +1055,26 @@ document.getElementById("heroBar").addEventListener("submit", async (e) => {
 
 // ---------- file upload (the reliable source) ----------
 let uploadId = null, uploadXhr = null, localObjectUrl = null;
+let activeSource = "link"; // which tab the user is on
+
+// Small inline nudge under the tool instead of a silent no-op.
+function toolHint(msg) {
+  const el = $("toolHint");
+  el.textContent = msg;
+  el.style.display = "block";
+  clearTimeout(toolHint._t);
+  toolHint._t = setTimeout(() => { el.style.display = "none"; }, 4000);
+}
 
 document.querySelectorAll(".src-tab").forEach((t) => t.addEventListener("click", () => {
   document.querySelectorAll(".src-tab").forEach((x) => x.classList.remove("active"));
   t.classList.add("active");
-  const src = t.dataset.src;
-  $("srcLink").style.display = src === "link" ? "block" : "none";
-  $("srcFile").style.display = src === "file" ? "block" : "none";
-  $("srcPodcast").style.display = src === "podcast" ? "block" : "none";
-  // Clear the other sources so we never send two at once.
-  if (src === "file") { urlInput.value = ""; $("preview").style.display = "none"; }
-  else clearUpload();
-  if (src !== "podcast") $("epList").innerHTML = "";
+  activeSource = t.dataset.src;
+  $("srcLink").style.display = activeSource === "link" ? "block" : "none";
+  $("srcFile").style.display = activeSource === "file" ? "block" : "none";
+  $("srcPodcast").style.display = activeSource === "podcast" ? "block" : "none";
+  // Switching tabs no longer destroys what you already entered — which source
+  // gets used is decided by the button you press.
 }));
 
 // ---------- podcast feed ----------
@@ -1085,6 +1102,7 @@ async function loadFeed() {
       const ep = d.episodes[+b.dataset.i];
       // An episode is just a direct media URL — reuse the normal link flow.
       urlInput.value = ep.url;
+      $("goPodcast").disabled = false;
       showEpisodePreview(ep);
     }));
   } catch (err) {
@@ -1210,6 +1228,7 @@ function showLocalPreview(objUrl, name) {
 }
 
 $("goFile").addEventListener("click", () => start(true));
+$("goPodcast").addEventListener("click", () => start(false)); // episode URL is in urlInput
 
 initTool();
 </script>
