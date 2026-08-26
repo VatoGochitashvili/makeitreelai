@@ -81,7 +81,7 @@ document.querySelectorAll("[data-oauth]").forEach((b) => b.addEventListener("cli
     const r = await fetch("/api/oauth/" + b.dataset.oauth, { method: "POST" });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || "Sign-in failed");
-    location.href = "/";
+    location.href = "/studio.html";
   } catch (e) { msg.className = "auth-msg err"; msg.textContent = e.message; }
 }));
 form.addEventListener("submit", async (e) => {
@@ -101,7 +101,7 @@ form.addEventListener("submit", async (e) => {
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || "Could not create account");
     msg.className = "auth-msg ok"; msg.textContent = "Account created! Redirecting…";
-    location.href = "/";
+    location.href = "/studio.html";
   } catch (err) {
     msg.className = "auth-msg err"; msg.textContent = err.message;
     submit.disabled = false; submit.textContent = "Create account";

@@ -216,6 +216,7 @@ app.post("/api/clip", async (req, res) => {
   const job = {
     id, logs: [], status: "running", clips: [], error: null,
     stage: "queued", progress: 0, detail: null, errorCode: null,
+    startedAt: Date.now(), source: sourceFile ? "upload" : cleanUrl,
   };
   job.abort = new AbortController();
   job.children = new Set();
@@ -430,6 +431,20 @@ app.get("/api/worker-status", (req, res) => {
   res.json({ enabled: workerEnabled(), online: workerOnline() });
 });
 
+// Jobs run on the server, so closing the tab doesn't stop them. This lets a
+// returning page pick its job back up instead of losing track of it.
+app.get("/api/jobs/mine", (req, res) => {
+  if (!req.user) return res.json({ jobs: [] });
+  const mine = [...jobs.values()]
+    .filter((j) => j.userId === req.user.id && j.status === "running")
+    .sort((a, b) => b.startedAt - a.startedAt)
+    .map((j) => ({
+      id: j.id, stage: j.stage, progress: j.progress, detail: j.detail,
+      startedAt: j.startedAt, source: j.source,
+    }));
+  res.json({ jobs: mine });
+});
+
 // Stop a running job. Kills the tools mid-flight and aborts API calls, so
 // cancelling early genuinely avoids the spend.
 app.post("/api/jobs/:id/cancel", (req, res) => {
@@ -459,6 +474,7 @@ app.get("/api/jobs/:id", (req, res) => {
     stage: job.stage,
     progress: job.progress,
     detail: job.detail,
+    elapsedMs: Date.now() - (job.startedAt || Date.now()),
   });
 });
 

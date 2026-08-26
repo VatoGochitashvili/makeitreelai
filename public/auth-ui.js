@@ -16,6 +16,7 @@
     const initial = (u.name || u.email || "?").trim().charAt(0).toUpperCase();
     const planLabel = { free: "Free", creator: "Creator", pro: "Pro" }[u.plan] || u.plan;
     navRight.innerHTML = `
+      <a class="btn ghost" href="/studio.html">Studio</a>
       <a class="btn ghost" href="/my-reels.html">My Reels</a>
       <a class="acct" href="/account.html" title="Account & billing">
         <span class="plan-tag">${planLabel}</span>
