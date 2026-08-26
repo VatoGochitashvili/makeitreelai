@@ -216,10 +216,18 @@ app.post("/api/clip", async (req, res) => {
     id, logs: [], status: "running", clips: [], error: null,
     stage: "queued", progress: 0, detail: null, errorCode: null,
   };
+  console.log(`\n▶ [${id.slice(0, 6)}] new job — ${user.email} — ${sourceFile ? "uploaded file" : url}`);
   jobs.set(id, job);
   res.json({ jobId: id });
 
-  const log = (msg) => { job.logs.push({ t: Date.now(), msg }); };
+  const short = id.slice(0, 6);
+  const log = (msg) => {
+    job.logs.push({ t: Date.now(), msg });
+    // Mirror to the terminal so you can watch a run without opening the browser.
+    // yt-dlp/ffmpeg chatter is noisy, so keep those out unless DEBUG_JOBS=1.
+    const noisy = /^\[(download|youtube|info|Merger|ExtractAudio)|^\s*(frame|size)=|out_time_ms/.test(msg);
+    if (!noisy || process.env.DEBUG_JOBS) console.log(`[${short}] ${msg}`);
+  };
   const onProgress = (stage, pct, detail) => {
     job.stage = stage;
     job.progress = Math.max(job.progress, pct); // never go backwards
@@ -260,6 +268,7 @@ app.post("/api/clip", async (req, res) => {
     job.clips = published;
     job.status = "done";
     job.stage = "done"; job.progress = 100;
+    console.log(`✓ [${id.slice(0, 6)}] done — ${published.length} clips`);
     // save this batch to the user's "My Reels" library
     addReels(user.id, published, cleanUrl);
     // best-effort cleanup of the temp working dir (and the uploaded source)
