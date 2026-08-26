@@ -383,6 +383,12 @@ app.get("/api/podcast", async (req, res) => {
   }
 });
 
+// Which build is actually running? Included in error reports so a stale
+// cached page is obvious instead of looking like a fresh bug.
+const BUILD = (process.env.RENDER_GIT_COMMIT || "dev").slice(0, 7);
+const STARTED = new Date().toISOString();
+app.get("/api/version", (_req, res) => res.json({ build: BUILD, started: STARTED }));
+
 // Is a download helper connected? (drives the UI hint)
 app.get("/api/worker-status", (req, res) => {
   res.json({ enabled: workerEnabled(), online: workerOnline() });
