@@ -326,7 +326,7 @@ async function downloadSection(url, workDir, log, start, end, index) {
 }
 
 // --- 2. transcribe with timestamps (Whisper) ---
-async function transcribe(videoPath, workDir, log, range = null) {
+async function transcribe(videoPath, workDir, log, range = null, progress = () => {}) {
   // Only transcribe the slice the user selected — cheaper, and it keeps every
   // clip inside their chosen interval. Offset is added back at the end so all
   // timestamps stay absolute against the source video.
@@ -352,13 +352,18 @@ async function transcribe(videoPath, workDir, log, range = null) {
 
   const t0 = Date.now();
   let lastNote = 0;
+  const totalSec = range ? (range.end - range.start) : await probeDurationSec(videoPath).catch(() => 0);
   await run(FFMPEG, extract, {
     onLog: (line) => {
       // ffmpeg -progress emits out_time_ms=...; report every ~20s
       const m = /out_time_ms=(\d+)/.exec(line);
-      if (m && Date.now() - lastNote > 20000) {
+      if (!m) return;
+      const done = Number(m[1]) / 1e6;
+      // 30 -> 32% across the extraction so the bar keeps creeping
+      if (totalSec) progress("transcribe", 30 + Math.min(2, (done / totalSec) * 2));
+      if (Date.now() - lastNote > 15000) {
         lastNote = Date.now();
-        log(`  …extracted ${Math.round(Number(m[1]) / 1e6)}s of audio so far`);
+        log(`  …extracted ${Math.round(done)}s of audio so far`);
       }
     },
   });
@@ -390,6 +395,7 @@ async function transcribe(videoPath, workDir, log, range = null) {
     if ((await fs.stat(chunk)).size < 3000) continue;
 
     log(`  transcribing chunk ${i + 1}/${nChunks}…`);
+    progress("transcribe", 32 + Math.round((i / nChunks) * 22), { current: i + 1, total: nChunks });
     const r = await transcribeFile(chunk);
     for (const x of r.segments) segments.push({ ...x, start: x.start + start, end: x.end + start });
     for (const w of r.words) words.push({ ...w, start: w.start + start, end: w.end + start });
@@ -892,20 +898,20 @@ export async function makeClips(url, log = () => {}, opts = {}) {
     if (twoPhase) {
       // Audio was already trimmed to the range; shift back onto the source timeline.
       const off = range ? range.start : 0;
-      const r = await transcribe(analysisFile, workDir, log, null);
+      const r = await transcribe(analysisFile, workDir, log, null, progress);
       segments = r.segments.map((x) => ({ ...x, start: x.start + off, end: x.end + off }));
       words = r.words.map((x) => ({ ...x, start: x.start + off, end: x.end + off }));
     } else {
-      const r = await transcribe(analysisFile, workDir, log, range);
+      const r = await transcribe(analysisFile, workDir, log, range, progress);
       segments = r.segments; words = r.words;
     }
     if (!segments.length) throw new Error("No speech found to transcribe.");
-    progress("moments", 60);
+    progress("moments", 56);
     const moments = await selectMoments(segments, log, maxClips, lengthPref);
 
     const results = [];
     for (let i = 0; i < moments.length; i++) {
-      progress("render", 70 + Math.round((i / Math.max(1, moments.length)) * 28), {
+      progress("render", 60 + Math.round((i / Math.max(1, moments.length)) * 38), {
         current: i + 1, total: moments.length,
       });
       let file;

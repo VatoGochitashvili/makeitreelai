@@ -315,6 +315,7 @@
           <div id="progWrap">
             <div class="status"><span class="spinner" id="spin"></span><span id="statusText">Starting…</span></div>
             <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
+            <div class="prog-pct" id="progPct">0%</div>
             <div class="prog-steps" id="progSteps">
               <span class="pstep" data-stage="download">Download</span>
               <span class="pstep" data-stage="transcribe">Transcribe</span>
@@ -939,6 +940,7 @@ async function start(fromUpload) {
   clipsEl.innerHTML = ""; logEl.textContent = ""; panel.classList.add("show");
   $("errBox").style.display = "none";
   $("progWrap").style.display = "block";
+  shownPct = 0; targetPct = 2; clearInterval(creepTimer); creepTimer = null;
   $("progFill").style.width = "2%";
   $("progHint").textContent = "This can take a few minutes — you can leave this tab open.";
   document.querySelectorAll(".pstep").forEach((el) => el.classList.remove("done", "active"));
@@ -968,15 +970,42 @@ const STAGE_LABELS = {
   done: "Finishing up…",
 };
 
+// The server only reports at stage boundaries, so the raw number sits still
+// and then jumps. Animate towards it instead, and keep creeping slowly while
+// we wait so the bar always looks alive — but never overtake the real value's
+// next milestone.
+let shownPct = 0, targetPct = 0, creepTimer = null;
+const STAGE_CEIL = { queued: 5, download: 30, transcribe: 56, moments: 60, render: 98, done: 100 };
+
+function animateProgress() {
+  clearInterval(creepTimer);
+  creepTimer = setInterval(() => {
+    // ease 25% of the remaining distance each tick
+    if (shownPct < targetPct) shownPct += Math.max(0.15, (targetPct - shownPct) * 0.25);
+    else if (shownPct < targetPct + 0.01) {
+      // caught up: creep gently towards the current stage's ceiling
+      shownPct = Math.min(shownPct + 0.06, Math.max(targetPct, ceilPct - 0.5));
+    }
+    shownPct = Math.min(shownPct, 100);
+    $("progFill").style.width = shownPct.toFixed(1) + "%";
+    $("progPct").textContent = Math.floor(shownPct) + "%";
+  }, 200);
+}
+
+let ceilPct = 100;
+
 function paintProgress(d) {
-  const pct = Math.max(2, Math.min(100, d.progress || 0));
-  $("progFill").style.width = pct + "%";
+  targetPct = Math.max(2, Math.min(100, d.progress || 0));
+  ceilPct = STAGE_CEIL[d.stage] ?? 100;
+  if (!creepTimer) animateProgress();
 
   let label = STAGE_LABELS[d.stage] || "Working…";
   if (d.stage === "render" && d.detail && d.detail.total) {
     label = `Rendering clip ${d.detail.current} of ${d.detail.total}…`;
+  } else if (d.stage === "transcribe" && d.detail && d.detail.total) {
+    label = `Transcribing part ${d.detail.current} of ${d.detail.total}…`;
   }
-  statusText.textContent = `${label} ${pct}%`;
+  statusText.textContent = label;
 
   // tick off the steps we've passed
   const order = ["download", "transcribe", "moments", "render"];
@@ -1000,6 +1029,8 @@ async function poll(jobId) {
       setTimeout(() => poll(jobId), 1500);
     } else if (d.status === "done") {
       paintProgress({ ...d, stage: "done", progress: 100 });
+      clearInterval(creepTimer); creepTimer = null;
+      $("progFill").style.width = "100%"; $("progPct").textContent = "100%";
       spin.style.display = "none";
       statusText.textContent = "✅ " + d.clips.length + " clips ready!";
       $("progHint").textContent = "";
@@ -1034,6 +1065,7 @@ function renderClips(clips) {
 }
 
 function fail(msg, code, logs) {
+  clearInterval(creepTimer); creepTimer = null;
   spin.style.display = "none";
   $("progWrap").style.display = "none";
   $("errBox").style.display = "block";
