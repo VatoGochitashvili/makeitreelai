@@ -30,6 +30,18 @@ function openai() {
 }
 const MAX_CLIPS = parseInt(process.env.MAX_CLIPS || "6", 10);
 
+// Homebrew's default ffmpeg is built without libass/freetype, so captions
+// silently don't render. ffmpeg-full has them but is keg-only (off PATH).
+// Prefer it when present so local runs match production.
+function pickBin(name) {
+  const override = process.env[name.toUpperCase() + "_BIN"];
+  if (override) return override;
+  const full = `/opt/homebrew/opt/ffmpeg-full/bin/${name}`;
+  return existsSync(full) ? full : name;
+}
+const FFMPEG = pickBin("ffmpeg");
+const FFPROBE = pickBin("ffprobe");
+
 // --- small helper: run a shell command and capture output ---
 function run(cmd, args, { onLog } = {}) {
   return new Promise((resolve, reject) => {
@@ -90,7 +102,7 @@ function friendlyDownloadError(msg) {
 // --- small helper: read a media file's duration in seconds via ffprobe ---
 export function probeDurationSec(file) {
   return new Promise((resolve, reject) => {
-    const p = spawn("ffprobe", [
+    const p = spawn(FFPROBE, [
       "-v", "error",
       "-show_entries", "format=duration",
       "-of", "default=noprint_wrappers=1:nokey=1",
@@ -112,7 +124,7 @@ let _drawtext;
 function hasDrawtext() {
   if (_drawtext !== undefined) return Promise.resolve(_drawtext);
   return new Promise((resolve) => {
-    const p = spawn("ffmpeg", ["-hide_banner", "-filters"]);
+    const p = spawn(FFMPEG, ["-hide_banner", "-filters"]);
     let out = "";
     p.stdout.on("data", (d) => (out += d.toString()));
     p.on("error", () => resolve((_drawtext = false)));
@@ -124,7 +136,7 @@ function hasDrawtext() {
 // cropping video. Detect which we're dealing with.
 export function hasVideoStream(file) {
   return new Promise((resolve) => {
-    const p = spawn("ffprobe", [
+    const p = spawn(FFPROBE, [
       "-v", "error", "-select_streams", "v:0",
       "-show_entries", "stream=codec_type", "-of", "csv=p=0", file,
     ]);
@@ -311,7 +323,7 @@ async function transcribe(videoPath, workDir, log, range = null) {
 
   const t0 = Date.now();
   let lastNote = 0;
-  await run("ffmpeg", extract, {
+  await run(FFMPEG, extract, {
     onLog: (line) => {
       // ffmpeg -progress emits out_time_ms=...; report every ~20s
       const m = /out_time_ms=(\d+)/.exec(line);
@@ -343,7 +355,7 @@ async function transcribe(videoPath, workDir, log, range = null) {
     const start = i * TRANSCRIBE_CHUNK_SEC;
     const chunk = path.join(workDir, `chunk_${i}.mp3`);
     // -ss before -i seeks by input; -c copy keeps it fast and lossless.
-    await run("ffmpeg", ["-y", "-ss", String(start), "-t", String(TRANSCRIBE_CHUNK_SEC), "-i", audio, "-c", "copy", chunk]);
+    await run(FFMPEG, ["-y", "-ss", String(start), "-t", String(TRANSCRIBE_CHUNK_SEC), "-i", audio, "-c", "copy", chunk]);
 
     // A tiny trailing remainder can be effectively empty — skip it.
     if ((await fs.stat(chunk)).size < 3000) continue;
@@ -409,7 +421,7 @@ let _libass;
 function hasSubtitles() {
   if (_libass !== undefined) return Promise.resolve(_libass);
   return new Promise((resolve) => {
-    const p = spawn("ffmpeg", ["-hide_banner", "-filters"]);
+    const p = spawn(FFMPEG, ["-hide_banner", "-filters"]);
     let out = "";
     p.stdout.on("data", (d) => (out += d.toString()));
     p.on("error", () => resolve((_libass = false)));
@@ -542,7 +554,7 @@ async function cutAudiogram(srcPath, clip, index, workDir, resolution, caption, 
     ? `[bg]drawtext=text='${title}':${style.draw(fontsize)}:x=(w-text_w)/2:y=${Math.round(H * 0.16)}:line_spacing=10[v]`
     : `[bg]null[v]`);
 
-  await run("ffmpeg", [
+  await run(FFMPEG, [
     "-y",
     "-f", "lavfi", "-i", `color=c=0x0b1020:s=${W}x${H}:d=${dur}`,
     "-ss", String(clip.start), "-t", String(dur), "-i", srcPath,
@@ -609,7 +621,7 @@ async function cutClip(videoPath, clip, index, workDir, resolution, caption, log
   const vf = filters.join(",");
 
   log(`Cutting clip ${index + 1} @${H}p: "${clip.title || "untitled"}"…`);
-  await run("ffmpeg", [
+  await run(FFMPEG, [
     "-y",
     "-ss", String(clip.start),
     "-i", videoPath,
@@ -674,11 +686,11 @@ async function addNarratedIntro(baseClip, clip, index, workDir, resolution, voic
     "-c:a", "aac", "-b:a", "128k", "-ar", "44100", "-ac", "2",
     "-shortest", intro,
   );
-  await run("ffmpeg", introArgs);
+  await run(FFMPEG, introArgs);
 
   // Concat (re-encode) intro + clip into the final narrated short.
   const final = path.join(workDir, `final_${index + 1}.mp4`);
-  await run("ffmpeg", [
+  await run(FFMPEG, [
     "-y", "-i", intro, "-i", baseClip,
     "-filter_complex", "[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[v][a]",
     "-map", "[v]", "-map", "[a]",
