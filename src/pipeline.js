@@ -686,7 +686,7 @@ export async function makeClips(url, log = () => {}, opts = {}) {
     // as video later. Uploads and direct media are already cheap/local, so they
     // keep the simple whole-file path.
     const normalized = opts.sourceFile ? null : normalizeUrl(url).url;
-    const twoPhase = !opts.sourceFile && normalized && !isDirectMedia(normalized);
+    const twoPhase = !opts.sourceFile && !opts.externalDownload && normalized && !isDirectMedia(normalized);
 
     let video = null;      // full media, when we have it
     let analysisFile;      // what we transcribe
@@ -694,6 +694,11 @@ export async function makeClips(url, log = () => {}, opts = {}) {
     if (opts.sourceFile) {
       log("Using your uploaded video…");
       video = analysisFile = opts.sourceFile;
+    } else if (opts.externalDownload) {
+      // A home helper fetches the whole file for us; no two-phase needed since
+      // it isn't our bandwidth being metered.
+      video = analysisFile = await opts.externalDownload(url, workDir, log);
+      log("Received the video from your download helper.");
     } else if (twoPhase) {
       analysisFile = await downloadAudioOnly(url, workDir, log, range);
     } else {

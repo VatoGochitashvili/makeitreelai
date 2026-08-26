@@ -12,6 +12,7 @@ import { reelsRouter, addReels } from "./src/reels.js";
 import { planOf, VOICE_IDS } from "./src/plans.js";
 import { DATA_DIR } from "./src/store.js";
 import { fetchPodcastFeed, normalizeUrl, isDirectMedia } from "./src/sources.js";
+import { workerRouter, workerEnabled, requestDownload, workerOnline } from "./src/worker-queue.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -30,6 +31,7 @@ app.use(attachUser);
 app.use("/api", authRouter);
 app.use("/api", schedulerRouter);
 app.use("/api", reelsRouter);
+app.use("/api", workerRouter);
 
 // finished clips are served from here
 const CLIPS_DIR = path.join(__dirname, "public", "clips");
@@ -226,6 +228,11 @@ app.post("/api/clip", async (req, res) => {
       range: chosenRange,
       sourceFile,
       onProgress,
+      // With a helper connected, links are fetched on the user's own machine
+      // (a residential IP YouTube trusts) instead of from this server.
+      externalDownload: (!sourceFile && workerEnabled() && !isDirectMedia(normalizeUrl(url).url))
+        ? (u, dir, l) => requestDownload(u, dir, l)
+        : null,
     });
     // move clips into the public folder so the browser can play/download them
     const outDir = path.join(CLIPS_DIR, id);
@@ -374,6 +381,11 @@ app.get("/api/podcast", async (req, res) => {
   } catch (err) {
     res.status(400).json({ error: err.message || "Could not read that feed." });
   }
+});
+
+// Is a download helper connected? (drives the UI hint)
+app.get("/api/worker-status", (req, res) => {
+  res.json({ enabled: workerEnabled(), online: workerOnline() });
 });
 
 // Poll job status + logs
