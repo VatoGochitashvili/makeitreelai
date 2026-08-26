@@ -193,7 +193,15 @@ const WHISPER_LIMIT_BYTES = 24 * 1024 * 1024;
 const TRANSCRIBE_CHUNK_SEC = 15 * 60;
 
 // Send one audio file to Whisper and return its segments.
+// Rough public per-unit prices, only used to show what a run costs.
+const PRICE = { whisperPerMin: 0.006, gptInPer1k: 0.00015, gptOutPer1k: 0.0006, ttsPer1k: 0.015 };
+let aiLog = () => {};
+export function setAiLogger(fn) { aiLog = fn || (() => {}); }
+
 async function transcribeFile(file) {
+  const t0 = Date.now();
+  const mb = ((await fs.stat(file)).size / 1e6).toFixed(1);
+  aiLog(`  🤖 Whisper (whisper-1): uploading ${mb} MB…`);
   const res = await openai().audio.transcriptions.create({
     file: createReadStream(file),
     model: "whisper-1",
@@ -202,6 +210,10 @@ async function transcribeFile(file) {
     // Same call, same cost — we just ask for more detail.
     timestamp_granularities: ["segment", "word"],
   });
+  const mins = (res.duration || 0) / 60;
+  aiLog(`  🤖 Whisper done in ${((Date.now() - t0) / 1000).toFixed(1)}s — ` +
+        `${(res.segments || []).length} segments, ${(res.words || []).length} words, ` +
+        `~$${(mins * PRICE.whisperPerMin).toFixed(3)}`);
   return { segments: res.segments || [], words: res.words || [] };
 }
 
@@ -493,12 +505,20 @@ Return ONLY valid JSON in this exact shape:
 Transcript:
 ${transcript}`;
 
+  const gptT0 = Date.now();
+  aiLog(`  🤖 GPT (gpt-4o-mini): analysing ${segments.length} transcript segments…`);
   const completion = await openai().chat.completions.create({
     model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
     temperature: 0.4,
   });
+
+  const u = completion.usage || {};
+  aiLog(`  🤖 GPT done in ${((Date.now() - gptT0) / 1000).toFixed(1)}s — ` +
+        `${u.prompt_tokens || 0} in / ${u.completion_tokens || 0} out tokens, ` +
+        `~$${(((u.prompt_tokens || 0) / 1000) * PRICE.gptInPer1k +
+              ((u.completion_tokens || 0) / 1000) * PRICE.gptOutPer1k).toFixed(4)}`);
 
   let data;
   try {
@@ -755,6 +775,9 @@ async function cutClip(videoPath, clip, index, workDir, resolution, caption, log
 
 // --- 4b. AI voiceover: TTS the hook, then prepend a branded narrated intro card ---
 export async function synthSpeech(text, voice) {
+  const ttsT0 = Date.now();
+  aiLog(`  🤖 TTS (gpt-4o-mini-tts, voice "${voice || "alloy"}"): ${text.length} chars, ` +
+        `~$${((text.length / 1000) * PRICE.ttsPer1k).toFixed(4)}`);
   const res = await openai().audio.speech.create({
     model: "gpt-4o-mini-tts",
     voice: voice || "alloy",

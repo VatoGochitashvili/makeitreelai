@@ -4,7 +4,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
-import { makeClips, synthSpeech, probeVideoMeta, probeDurationSec } from "./src/pipeline.js";
+import { makeClips, synthSpeech, probeVideoMeta, probeDurationSec, setAiLogger } from "./src/pipeline.js";
 import { createWriteStream } from "node:fs";
 import { authRouter, attachUser, getUsage, bumpVideoUsage } from "./src/auth.js";
 import { schedulerRouter } from "./src/scheduler.js";
@@ -235,6 +235,7 @@ app.post("/api/clip", async (req, res) => {
   };
 
   try {
+    setAiLogger(log); // surface model calls, timings and costs in this job's log
     const { workDir, clips } = await makeClips(cleanUrl, log, {
       maxClips: chosenClips,
       resolution: plan.resolution,
