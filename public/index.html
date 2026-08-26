@@ -891,8 +891,10 @@ function renderMeta() {
     `<a class="meta-upgrade" href="/account.html">Manage plan →</a>`;
 }
 
-go.addEventListener("click", start);
-urlInput.addEventListener("keydown", (e) => { if (e.key === "Enter") start(); });
+// NB: pass an explicit false — a bare listener would hand start() the click
+// Event as its "fromUpload" argument, which is truthy and aborts the run.
+go.addEventListener("click", () => start(false));
+urlInput.addEventListener("keydown", (e) => { if (e.key === "Enter") start(false); });
 
 async function start(fromUpload) {
   const url = urlInput.value.trim();
