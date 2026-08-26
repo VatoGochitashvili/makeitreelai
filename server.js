@@ -431,4 +431,30 @@ app.get("/api/jobs/:id", (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`MakeItReel running on http://localhost:${PORT}`));
+const server = app.listen(PORT, () => {
+  console.log(`\n\x1b[32m●\x1b[0m MakeItReel running on \x1b[1mhttp://localhost:${PORT}\x1b[0m`);
+  console.log(`  Press \x1b[1mCtrl+C\x1b[0m to stop.\n`);
+});
+
+// Shut down cleanly and say so, and make sure closing the terminal
+// (SIGHUP) takes the server with it rather than leaving it orphaned.
+let stopping = false;
+function shutdown(signal) {
+  if (stopping) { process.exit(1); }   // second Ctrl+C: don't wait
+  stopping = true;
+
+  const running = [...jobs.values()].filter((j) => j.status === "running").length;
+  console.log(`\n\x1b[33m■\x1b[0m Stopping MakeItReel (${signal})…`);
+  if (running) console.log(`  ${running} job${running > 1 ? "s were" : " was"} still running and will not finish.`);
+
+  server.close(() => {
+    console.log(`\x1b[31m●\x1b[0m MakeItReel has stopped. localhost:${PORT} is no longer served.\n`);
+    process.exit(0);
+  });
+  // Don't hang forever on lingering connections.
+  setTimeout(() => {
+    console.log(`\x1b[31m●\x1b[0m MakeItReel has stopped.\n`);
+    process.exit(0);
+  }, 3000).unref();
+}
+for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, () => shutdown(sig));

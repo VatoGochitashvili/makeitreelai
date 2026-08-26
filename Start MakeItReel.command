@@ -67,4 +67,6 @@ printf 'Press \033[1mCtrl+C\033[0m to stop.\n\n'
     sleep 0.5
   done ) &
 
-exec npm start
+# Run node directly rather than via npm: npm doesn't forward signals to its
+# child, so closing this window would leave the server orphaned.
+exec node server.js
