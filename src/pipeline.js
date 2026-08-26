@@ -694,6 +694,104 @@ function buildAss(words, { W, H, style, position, size }) {
   return header + "\n" + events.join("\n") + "\n";
 }
 
+// Source dimensions, so the crop offset can be a plain number rather than an
+// ffmpeg expression (expressions contain commas, which ffmpeg reads as filter
+// separators unless escaped).
+function probeDims(file) {
+  return new Promise((resolve) => {
+    const p = spawn(FFPROBE, ["-v", "error", "-select_streams", "v:0",
+      "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", file]);
+    let out = "";
+    p.stdout.on("data", (d) => (out += d.toString()));
+    p.on("error", () => resolve(null));
+    p.on("close", () => {
+      const [w, h] = out.trim().split("x").map(Number);
+      resolve(w && h ? { w, h } : null);
+    });
+  });
+}
+
+// ---------- where is the subject? ----------
+// No face-detection library is available, but for talking-head video the
+// speaker is the thing that MOVES. Sample tiny greyscale frames, measure how
+// much each column changes between them, and take the centre of mass of that
+// motion as the subject's horizontal position. Cheap, dependency-free, and
+// good enough to stop cropping people out of frame.
+const ANALYSIS_W = 96, ANALYSIS_H = 54, ANALYSIS_FPS = 3;
+
+function sampleColumns(videoPath, start, dur) {
+  return new Promise((resolve) => {
+    const args = [
+      "-v", "error",
+      "-ss", String(start), "-t", String(Math.min(dur, 90)),
+      "-i", videoPath,
+      "-vf", `fps=${ANALYSIS_FPS},scale=${ANALYSIS_W}:${ANALYSIS_H},format=gray`,
+      "-f", "rawvideo", "-pix_fmt", "gray", "pipe:1",
+    ];
+    const p = spawn(FFMPEG, args);
+    const chunks = [];
+    p.stdout.on("data", (d) => chunks.push(d));
+    p.on("error", () => resolve([]));
+    p.on("close", () => {
+      const buf = Buffer.concat(chunks);
+      const frameSize = ANALYSIS_W * ANALYSIS_H;
+      const frames = Math.floor(buf.length / frameSize);
+      const out = [];
+      for (let f = 0; f < frames; f++) out.push(buf.subarray(f * frameSize, (f + 1) * frameSize));
+      resolve(out);
+    });
+  });
+}
+
+// Returns a fraction 0..1 of where the subject sits horizontally, or null.
+export async function findSubjectX(videoPath, start, dur, log) {
+  const frames = await sampleColumns(videoPath, start, dur);
+  if (frames.length < 2) return null;
+
+  const energy = new Float64Array(ANALYSIS_W);
+  for (let f = 1; f < frames.length; f++) {
+    const a = frames[f - 1], b = frames[f];
+    for (let y = 0; y < ANALYSIS_H; y++) {
+      const row = y * ANALYSIS_W;
+      for (let x = 0; x < ANALYSIS_W; x++) {
+        energy[x] += Math.abs(b[row + x] - a[row + x]);
+      }
+    }
+  }
+
+  // Smooth so a flickering background doesn't win.
+  const smooth = new Float64Array(ANALYSIS_W);
+  const R = 6;
+  for (let x = 0; x < ANALYSIS_W; x++) {
+    let sum = 0, n = 0;
+    for (let k = -R; k <= R; k++) {
+      const i = x + k;
+      if (i >= 0 && i < ANALYSIS_W) { sum += energy[i]; n++; }
+    }
+    smooth[x] = sum / n;
+  }
+
+  const peak = Math.max(...smooth);
+  const total = smooth.reduce((a, b) => a + b, 0);
+  if (!peak || !total) return null;
+
+  // Centre of mass of the strongest region only — ignores ambient noise.
+  const thresh = peak * 0.55;
+  let wsum = 0, w = 0;
+  for (let x = 0; x < ANALYSIS_W; x++) {
+    if (smooth[x] >= thresh) { wsum += x * smooth[x]; w += smooth[x]; }
+  }
+  if (!w) return null;
+
+  const frac = (wsum / w) / (ANALYSIS_W - 1);
+  // If motion is spread right across the frame there's no single subject.
+  const spread = smooth.filter((v) => v >= thresh).length / ANALYSIS_W;
+  if (spread > 0.7) return null;
+
+  if (log) log(`  subject sits ${Math.round(frac * 100)}% across the frame`);
+  return Math.min(0.92, Math.max(0.08, frac));
+}
+
 // 9:16 dimensions for a given target resolution (long edge height).
 function dims(resolution) {
   return resolution >= 1080 ? { W: 1080, H: 1920 } : { W: 720, H: 1280 };
@@ -768,7 +866,7 @@ async function cutAudiogram(srcPath, clip, index, workDir, resolution, caption, 
   return out;
 }
 
-async function cutClip(videoPath, clip, index, workDir, resolution, caption, log, words, motion = "subtle") {
+async function cutClip(videoPath, clip, index, workDir, resolution, caption, log, words, motion = "subtle", layout = "crop", subjectX = null) {
   const out = path.join(workDir, `clip_${index + 1}.mp4`);
   const dur = Math.max(1, clip.end - clip.start);
   const { W, H } = dims(resolution);
@@ -786,22 +884,52 @@ async function cutClip(videoPath, clip, index, workDir, resolution, caption, log
   // Normalize fps/pixfmt/audio so clips can be safely concatenated with an intro.
   // Scale to COVER the 9:16 frame (works for landscape or portrait sources),
   // then center-crop. Scaling only the width broke on landscape videos.
-  const filters = [
-    `scale=${W}:${H}:force_original_aspect_ratio=increase`,
-    `crop=${W}:${H}`,
-  ];
+  const filters = [];
 
-  // A slow, continuous push-in. Static centre crops read as flat; a gentle
-  // zoom keeps the frame alive the way edited shorts do. Applied before the
-  // captions so the text stays pinned and crisp.
-  if (motion !== "none") {
-    const fps = await probeFps(videoPath);
-    const total = Math.max(1, Math.round(dur * fps));
-    const amount = motion === "strong" ? 0.18 : 0.09;
+  if (layout === "fit") {
+    // Nothing is cropped: the whole frame sits on a blurred fill of itself.
+    // Best when the shot is wide, has several people, or shows something on
+    // screen that a crop would destroy.
     filters.push(
-      `zoompan=z='min(1+${amount}*on/${total},${(1 + amount).toFixed(2)})'` +
-      `:d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=${W}x${H}:fps=${fps.toFixed(4)}`
+      `split=2[bg][fg]`,
+      `[bg]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},` +
+        `boxblur=28:2,eq=brightness=-0.16:saturation=0.85[bgb]`,
+      `[fg]scale=${W}:-2:force_original_aspect_ratio=decrease[fgs]`,
+      `[bgb][fgs]overlay=(W-w)/2:(H-h)/2`
     );
+  } else {
+    // Cropping 16:9 to 9:16 discards ~68% of the width, so WHERE we crop
+    // matters far more than any zoom. Put the subject in frame instead of
+    // assuming they stand in the middle.
+    let xOff = null;
+    if (subjectX != null) {
+      const dims = await probeDims(videoPath);
+      if (dims) {
+        // Mirror what scale=…:force_original_aspect_ratio=increase will do,
+        // then place the window over the subject and clamp to the frame.
+        const f = Math.max(W / dims.w, H / dims.h);
+        const scaledW = Math.round(dims.w * f);
+        const target = 0.5 + (subjectX - 0.5) * 0.85;   // ease towards centre
+        xOff = Math.round(Math.min(Math.max(scaledW * target - W / 2, 0), Math.max(0, scaledW - W)));
+        log(`  framing on the subject (offset ${xOff}px of ${scaledW - W}px available)`);
+      }
+    }
+    filters.push(
+      `scale=${W}:${H}:force_original_aspect_ratio=increase`,
+      xOff == null ? `crop=${W}:${H}` : `crop=${W}:${H}:${xOff}:0`
+    );
+
+    // A very gentle push-in only — the crop is already a big magnification,
+    // so anything more makes clips feel claustrophobic.
+    if (motion !== "none") {
+      const fps = await probeFps(videoPath);
+      const total = Math.max(1, Math.round(dur * fps));
+      const amount = motion === "strong" ? 0.08 : 0.04;
+      filters.push(
+        `zoompan=z='min(1+${amount}*on/${total},${(1 + amount).toFixed(2)})'` +
+        `:d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=${W}x${H}:fps=${fps.toFixed(4)}`
+      );
+    }
   }
   // Preferred: animated word-timed captions burned from an .ass file.
   let assPath = null;
@@ -929,6 +1057,7 @@ export async function makeClips(url, log = () => {}, opts = {}) {
   const lengthPref = opts.length || "auto";
   const range = opts.range || null; // { start, end } seconds, or null for the whole video
   const motion = ["none", "subtle", "strong"].includes(opts.motion) ? opts.motion : "subtle";
+  const layout = ["crop", "fit"].includes(opts.layout) ? opts.layout : "crop";
   // Reports the current phase so the UI can show a real progress bar instead
   // of raw tool output. pct is an overall 0-100 estimate.
   const progress = opts.onProgress || (() => {});
@@ -991,6 +1120,14 @@ export async function makeClips(url, log = () => {}, opts = {}) {
       progress("render", 60 + Math.round((i / Math.max(1, moments.length)) * 38), {
         current: i + 1, total: moments.length,
       });
+      // Where is the speaker in this moment? (two-phase analyses the section
+      // once it's been fetched, below — there's no full file to sample yet.)
+      let subjectX = null;
+      if (layout === "crop" && !twoPhase) {
+        subjectX = await findSubjectX(video, moments[i].start,
+          moments[i].end - moments[i].start, log).catch(() => null);
+      }
+
       let file;
       if (twoPhase) {
         // Fetch only these seconds, then cut from the start of that section.
@@ -999,11 +1136,15 @@ export async function makeClips(url, log = () => {}, opts = {}) {
         const local = { ...moments[i], start: 0, end: Math.max(1, moments[i].end - moments[i].start) };
         file = await cutClip(sec, local, i, workDir, resolution, caption, log, 
           // shift words to be relative to this section
-          words.map((w) => ({ ...w, start: w.start - moments[i].start, end: w.end - moments[i].start })), motion);
+          words.map((w) => ({ ...w, start: w.start - moments[i].start, end: w.end - moments[i].start })),
+          motion, layout,
+          layout === "crop"
+            ? await findSubjectX(sec, 0, moments[i].end - moments[i].start, log).catch(() => null)
+            : null);
       } else if (isAudioOnly) {
         file = await cutAudiogram(video, moments[i], i, workDir, resolution, caption, log);
       } else {
-        file = await cutClip(video, moments[i], i, workDir, resolution, caption, log, words, motion);
+        file = await cutClip(video, moments[i], i, workDir, resolution, caption, log, words, motion, layout, subjectX);
       }
       let narrated = false;
       if (wantVoiceover) {

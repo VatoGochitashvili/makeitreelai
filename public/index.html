@@ -322,6 +322,13 @@
               </select>
             </div>
             <div class="set-field">
+              <label for="setLayout">Framing</label>
+              <select id="setLayout" class="voice-select">
+                <option value="crop" selected>Follow the speaker (crop)</option>
+                <option value="fit">Show whole frame (blurred sides)</option>
+              </select>
+            </div>
+            <div class="set-field">
               <label for="setMotion">Camera motion</label>
               <select id="setMotion" class="voice-select">
                 <option value="subtle" selected>Smooth zoom (recommended)</option>
@@ -608,7 +615,7 @@ async function initTool() {
       ME.plan.maxUploadMB >= 1024 ? (ME.plan.maxUploadMB / 1024) + " GB" : ME.plan.maxUploadMB + " MB"}`;
   }
 
-  ["setClips", "setLength", "setCapStyle", "setCapPos", "setCapSize", "setMotion"].forEach((id) =>
+  ["setClips", "setLength", "setCapStyle", "setCapPos", "setCapSize", "setMotion", "setLayout"].forEach((id) =>
     $(id).addEventListener("change", () => { renderCapPreview(); updateSetSum(); }));
 
   // Re-apply anything chosen before signing up.
@@ -624,6 +631,7 @@ async function initTool() {
     if (r.voiceover && canVoice) { voToggle.checked = true; voVoice.disabled = false; }
     if (r.voice) voVoice.value = r.voice;
     if (r.motion) $("setMotion").value = r.motion;
+    if (r.layout) $("setLayout").value = r.layout;
     $("settings").open = true;
   }
 
@@ -638,6 +646,7 @@ function currentSettings() {
     length: $("setLength").value,
     caption: { style: $("setCapStyle").value, position: $("setCapPos").value, size: $("setCapSize").value },
     motion: $("setMotion").value,
+    layout: $("setLayout").value,
     voiceover: !voToggle.disabled && voToggle.checked,
     voice: voVoice.value,
   };

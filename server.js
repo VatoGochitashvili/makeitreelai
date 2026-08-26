@@ -138,7 +138,7 @@ app.post("/api/clip", async (req, res) => {
   const user = req.user;
   if (!user) return res.status(401).json({ error: "Please log in to generate clips." });
 
-  const { url, uploadId, voiceover: voiceoverReq, voice, caption, length, clips: clipsReq, range, motion } = req.body || {};
+  const { url, uploadId, voiceover: voiceoverReq, voice, caption, length, clips: clipsReq, range, motion, layout } = req.body || {};
 
   // Accept "youtube.com/watch?v=..." the way a browser would.
   const cleanUrl = url && !/^https?:\/\//i.test(url) ? "https://" + String(url).trim() : url;
@@ -196,6 +196,7 @@ app.post("/api/clip", async (req, res) => {
   };
   const chosenLength = ["auto", "short", "medium", "long"].includes(length) ? length : "auto";
   const chosenMotion = ["none", "subtle", "strong"].includes(motion) ? motion : "subtle";
+  const chosenLayout = ["crop", "fit"].includes(layout) ? layout : "crop";
 
   // Optional [start, end] window — clips are only taken from this slice.
   let chosenRange = null;
@@ -250,6 +251,7 @@ app.post("/api/clip", async (req, res) => {
       length: chosenLength,
       range: chosenRange,
       motion: chosenMotion,
+      layout: chosenLayout,
       sourceFile,
       onProgress,
       // With a helper connected, links are fetched on the user's own machine
