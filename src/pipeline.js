@@ -297,12 +297,31 @@ async function transcribe(videoPath, workDir, log, range = null) {
     log("Transcribing audio…");
   }
 
-  // extract a compressed audio track first (smaller upload, cheaper)
+  // Extract a compressed audio track first (smaller upload, cheaper).
+  // This is CPU-bound and can take minutes on a small instance, so say what's
+  // happening rather than going silent.
   const audio = path.join(workDir, "audio.mp3");
+  const srcMb = ((await fs.stat(videoPath)).size / 1e6).toFixed(0);
+  log(`Extracting audio from a ${srcMb} MB file (this is the slow part on small servers)…`);
+
   const extract = ["-y"];
   if (range) extract.push("-ss", String(range.start), "-t", String(range.end - range.start));
-  extract.push("-i", videoPath, "-vn", "-ac", "1", "-ar", "16000", "-b:a", "64k", audio);
-  await run("ffmpeg", extract);
+  extract.push("-i", videoPath, "-vn", "-ac", "1", "-ar", "16000", "-b:a", "64k",
+    "-threads", "0", "-loglevel", "error", "-stats_period", "20", "-progress", "pipe:1", audio);
+
+  const t0 = Date.now();
+  let lastNote = 0;
+  await run("ffmpeg", extract, {
+    onLog: (line) => {
+      // ffmpeg -progress emits out_time_ms=...; report every ~20s
+      const m = /out_time_ms=(\d+)/.exec(line);
+      if (m && Date.now() - lastNote > 20000) {
+        lastNote = Date.now();
+        log(`  …extracted ${Math.round(Number(m[1]) / 1e6)}s of audio so far`);
+      }
+    },
+  });
+  log(`Audio extracted in ${Math.round((Date.now() - t0) / 1000)}s.`);
 
   const shift = (arr) => (offset ? arr.map((x) => ({ ...x, start: x.start + offset, end: x.end + offset })) : arr);
   const size = (await fs.stat(audio)).size;
