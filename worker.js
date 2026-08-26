@@ -21,8 +21,19 @@ const TOKEN = process.env.WORKER_TOKEN;
 const POLL_MS = Number(process.env.WORKER_POLL_MS || 5000);
 
 if (!TOKEN) {
-  console.error("Set WORKER_TOKEN to the same value as your server's WORKER_TOKEN.");
+  console.error("✗ Set WORKER_TOKEN to the same value as your server's WORKER_TOKEN.");
   process.exit(1);
+}
+if (/your-app\.onrender\.com/.test(SERVER)) {
+  console.error("✗ SERVER_URL is still the example value.\n" +
+    "  Point it at your own site, e.g.\n" +
+    "    SERVER_URL=https://makeitreelai.onrender.com WORKER_TOKEN=... npm run worker\n" +
+    "  or for local testing:\n" +
+    "    SERVER_URL=http://localhost:3000 WORKER_TOKEN=... npm run worker");
+  process.exit(1);
+}
+if (!process.env.SERVER_URL) {
+  console.log("! SERVER_URL not set — defaulting to http://localhost:3000\n");
 }
 
 const headers = { "x-worker-token": TOKEN };
@@ -88,7 +99,10 @@ for (;;) {
     fetch(`${SERVER}/api/worker/ping`, { headers }).catch(() => {});
     warned = false;
   } catch (e) {
-    if (!warned) { console.log(`\n… can't reach ${SERVER} (retrying)`); warned = true; }
+    if (!warned) {
+      console.log(`\n… can't reach ${SERVER} — is that the right address, and is the site up? (retrying)`);
+      warned = true;
+    }
   }
   await new Promise((r) => setTimeout(r, POLL_MS));
 }
