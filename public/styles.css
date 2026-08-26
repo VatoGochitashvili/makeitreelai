@@ -108,7 +108,11 @@ nav.site .wrap { display: flex; align-items: center; height: 72px; gap: 20px; }
 .nav-links { display: flex; gap: 28px; margin-left: 18px; }
 .nav-links a { color: var(--muted); text-decoration: none; font-size: 15px; font-weight: 500; transition: color var(--t); }
 .nav-links a:hover { color: var(--text); }
-.nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; min-height: 40px; }
+/* Until /api/me answers we don't know who this is — showing "Log in" first and
+   swapping it a moment later reads as being signed out unexpectedly. */
+.nav-right.resolving > * { opacity: 0; pointer-events: none; }
+.nav-right > * { transition: opacity var(--t); }
 @media (max-width: 820px) { .nav-links { display: none; } }
 
 /* ---------- buttons ---------- */
@@ -828,3 +832,71 @@ footer.site nav a:hover { color: var(--text); }
   display: grid; place-items: center; font-weight: 800; font-size: 14px; font-family: 'Space Grotesk', sans-serif;
 }
 .acct .plan-tag { font-size: 12px; font-weight: 700; color: var(--cyan); border: 1px solid var(--line2); padding: 3px 9px; border-radius: 100px; }
+
+/* ---------- centred hero over a wall of drifting reels ---------- */
+.hero { position: relative; padding: 120px 0 96px; overflow: hidden; min-height: 620px; }
+.hero .hero-center {
+  position: relative; z-index: 2; text-align: center;
+  max-width: 760px; display: flex; flex-direction: column; align-items: center;
+}
+.hero .hero-center h1 { font-size: clamp(40px, 6vw, 68px); margin: 22px 0 18px; }
+.hero .hero-center p.sub { max-width: 560px; margin: 0 auto; }
+.hero .hero-center .hero-bar { margin: 32px auto 0; width: 100%; max-width: 580px; }
+.hero .hero-center .hero-bar-sub,
+.hero .hero-center .trust { justify-content: center; }
+.hero .hero-center .trust { display: flex; }
+
+/* the wall itself: columns of reels drifting at different speeds, dimmed
+   hard so it reads as texture behind the copy rather than content */
+.reel-wall {
+  position: absolute; inset: -8% -4%; z-index: 0; display: flex; gap: 22px;
+  justify-content: center; pointer-events: none;
+  filter: saturate(.6) brightness(.5) blur(.5px);
+  opacity: .62;
+  /* keep the very centre clear for the copy, let the rest show through */
+  mask-image:
+    radial-gradient(78% 62% at 50% 46%, transparent 18%, rgba(0,0,0,.55) 52%, #000 82%),
+    linear-gradient(180deg, transparent 0%, #000 12%, #000 82%, transparent 100%);
+  -webkit-mask-image:
+    radial-gradient(78% 62% at 50% 46%, transparent 18%, rgba(0,0,0,.55) 52%, #000 82%),
+    linear-gradient(180deg, transparent 0%, #000 12%, #000 82%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+.wall-col { width: 190px; flex: 0 0 auto; overflow: hidden; }
+.wall-track { display: flex; flex-direction: column; gap: 16px; }
+.wall-col.c1 .wall-track { animation: wall-up 70s linear infinite; }
+.wall-col.c4 .wall-track { animation: wall-down 78s linear infinite; }
+.wall-col.c5 .wall-track { animation: wall-up 104s linear infinite; }
+.wall-col.c2 .wall-track { animation: wall-down 88s linear infinite; }
+.wall-col.c3 .wall-track { animation: wall-up 96s linear infinite; }
+@keyframes wall-up   { from { transform: translateY(0); }    to { transform: translateY(-50%); } }
+@keyframes wall-down { from { transform: translateY(-50%); } to { transform: translateY(0); } }
+
+.reel-wall .reel {
+  height: 330px; border-radius: 18px; overflow: hidden; flex: 0 0 auto;
+  position: relative; display: flex; flex-direction: column; justify-content: flex-end; padding: 14px;
+}
+.reel-wall .reel .score,
+.reel-wall .reel .play { display: none; }
+.reel-wall .reel .cap { font-size: 15px; }
+.reel-wall .reel .handle { font-size: 10px; }
+
+@media (max-width: 1200px) { .wall-col.c5 { display: none; } }
+@media (max-width: 980px) { .wall-col.c4 { display: none; } }
+@media (max-width: 900px) { .wall-col.c3 { display: none; } }
+@media (max-width: 620px) { .wall-col.c2 { display: none; } .reel-wall { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .wall-track { animation: none !important; } }
+
+/* logo hover: light up the wordmark and the dot together */
+.logo .wm-reel { transition: filter var(--t); }
+.logo:hover .wm-reel { filter: brightness(1.45) saturate(1.25) drop-shadow(0 0 12px rgba(192, 92, 255, .55)); }
+.logo:hover .dot { transform: scale(1.25); box-shadow: 0 0 26px rgba(192, 92, 255, .95); }
+
+/* page transitions */
+@keyframes page-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+body { animation: page-in .42s var(--ease) both; }
+body.leaving { opacity: 0; transform: translateY(-6px); transition: opacity .22s var(--ease), transform .22s var(--ease); }
+@media (prefers-reduced-motion: reduce) {
+  body, body.leaving { animation: none; transition: none; transform: none; opacity: 1; }
+}
