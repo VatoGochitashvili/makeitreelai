@@ -72,6 +72,12 @@ function resolveProxy(session) {
 
 // Turn yt-dlp's bot-block errors into something the user can act on.
 function friendlyDownloadError(msg) {
+  // A stale yt-dlp is the usual cause of sudden 403s on video data.
+  if (/403|Forbidden|page needs to be reloaded|No video formats found/i.test(msg)) {
+    return "YouTube refused this download. This usually means the downloader is out of date — " +
+      "updating yt-dlp fixes it (redeploy the server, or run `brew upgrade yt-dlp` on the machine " +
+      "running the helper). If it persists, the video may be DRM-protected; try uploading the file instead.";
+  }
   if (/Sign in to confirm|not a bot|429|Too Many Requests|cookies/i.test(msg)) {
     return "YouTube is blocking this download (it does that to servers, not to you). " +
       "Try one of these instead — they can't be blocked: upload the file directly " +

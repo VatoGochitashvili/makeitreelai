@@ -38,20 +38,48 @@ if (!process.env.SERVER_URL) {
 
 const headers = { "x-worker-token": TOKEN };
 
-function ytdlp(url, out) {
+function runYtdlp(args) {
   return new Promise((resolve, reject) => {
-    const p = spawn("yt-dlp", [
-      "--no-warnings", "--no-playlist",
-      "-f", "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-      "--merge-output-format", "mp4",
-      "-o", out, url,
-    ]);
+    const p = spawn("yt-dlp", args);
     let err = "";
     p.stdout.on("data", (d) => process.stdout.write("  " + d.toString()));
     p.stderr.on("data", (d) => { err += d.toString(); });
     p.on("error", reject);
     p.on("close", (code) => (code === 0 ? resolve() : reject(new Error(err.slice(-400) || `yt-dlp exited ${code}`))));
   });
+}
+
+// YouTube refuses its player clients unevenly — a video that 403s on one is
+// often served fine by another. Same fallback the server uses.
+const CLIENTS = (process.env.YTDLP_CLIENTS
+  || "default,tv,ios,mweb,web_embedded,tv_embedded,android").split(",").map((c) => c.trim()).filter(Boolean);
+
+async function ytdlp(url, out) {
+  let lastErr;
+  for (const client of CLIENTS) {
+    const args = [
+      "--no-warnings", "--no-playlist",
+      "--retries", "5", "--extractor-retries", "5", "--sleep-requests", "1",
+      "-f", "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+      "--merge-output-format", "mp4",
+      "-o", out, url,
+    ];
+    if (client !== "default") args.push("--extractor-args", `youtube:player_client=${client}`);
+    if (process.env.YTDLP_COOKIES) args.push("--cookies", process.env.YTDLP_COOKIES);
+
+    try {
+      await runYtdlp(args);
+      if (client !== "default") console.log(`  (worked with the "${client}" player)`);
+      return;
+    } catch (e) {
+      lastErr = e;
+      // A private/deleted/DRM video fails the same way everywhere — don't grind.
+      if (!/403|Forbidden|Sign in to confirm|not a bot|429|Requested format|unable to download/i.test(e.message)) break;
+      console.log(`  "${client}" refused — trying another player…`);
+      await fs.rm(out, { force: true }).catch(() => {});
+    }
+  }
+  throw lastErr || new Error("Download failed.");
 }
 
 async function handle(job) {
@@ -81,6 +109,23 @@ async function handle(job) {
     await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
   }
 }
+
+// An out-of-date yt-dlp is the single most common cause of sudden 403s,
+// because YouTube changes and yt-dlp ships fixes within days.
+async function reportYtdlpVersion() {
+  await new Promise((resolve) => {
+    const p = spawn("yt-dlp", ["--version"]);
+    let v = "";
+    p.stdout.on("data", (d) => (v += d.toString()));
+    p.on("error", () => { console.log("! yt-dlp not found on PATH — install it (brew install yt-dlp)"); resolve(); });
+    p.on("close", () => {
+      const ver = v.trim();
+      if (ver) console.log(`yt-dlp ${ver}  (if downloads start failing with 403, run: brew upgrade yt-dlp)`);
+      resolve();
+    });
+  });
+}
+await reportYtdlpVersion();
 
 console.log(`MakeItReel download helper → ${SERVER}`);
 console.log("Leave this running. Press Ctrl+C to stop.\n");
