@@ -313,7 +313,11 @@
         <div class="panel" id="panel">
           <!-- friendly progress: a bar and named steps, not raw tool output -->
           <div id="progWrap">
-            <div class="status"><span class="spinner" id="spin"></span><span id="statusText">Starting…</span></div>
+            <div class="status">
+              <span class="spinner" id="spin"></span>
+              <span id="statusText">Starting…</span>
+              <button type="button" class="stop-btn" id="stopBtn">Stop</button>
+            </div>
             <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
             <div class="prog-pct" id="progPct">0%</div>
             <div class="prog-steps" id="progSteps">
@@ -495,6 +499,7 @@ const go = $("go"), urlInput = $("url"), panel = $("panel"), logEl = $("log"),
       voToggle = $("voToggle"), voVoice = $("voVoice"), voLock = $("voLock"), voSwitch = $("voSwitch");
 
 let ME = null;              // { user, plan, usage }
+let currentJobId = null;    // the job the Stop button acts on
 let restoreSettings = null; // settings chosen before signing up
 
 // Decide login-gated vs ready, and configure the plan-specific controls.
@@ -943,6 +948,7 @@ async function start(fromUpload) {
   shownPct = 0; targetPct = 2; clearInterval(creepTimer); creepTimer = null;
   $("progFill").style.width = "2%";
   $("progHint").textContent = "This can take a few minutes — you can leave this tab open.";
+  $("stopBtn").style.display = "inline-block"; $("stopBtn").disabled = false; $("stopBtn").textContent = "Stop";
   document.querySelectorAll(".pstep").forEach((el) => el.classList.remove("done", "active"));
   spin.style.display = "inline-block"; statusText.textContent = "Starting…";
   go.disabled = true; $("goFile").disabled = true;
@@ -950,12 +956,13 @@ async function start(fromUpload) {
   const body = fromUpload ? { uploadId, ...currentSettings() } : { url, ...currentSettings() };
 
   let jobId;
+  currentJobId = null;
   try {
     const r = await fetch("/api/clip", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const d = await r.json();
     if (r.status === 401) { loginGate.style.display = "block"; toolMain.style.display = "none"; return; }
     if (!r.ok) throw new Error((d.upgrade ? "⬆ " : "") + (d.error || "Failed to start"));
-    jobId = d.jobId;
+    jobId = currentJobId = d.jobId;
   } catch (err) { fail(err.message); return; }
 
   poll(jobId);
@@ -1036,11 +1043,21 @@ async function poll(jobId) {
       clearInterval(creepTimer); creepTimer = null;
       $("progFill").style.width = "100%"; $("progPct").textContent = "100%";
       spin.style.display = "none";
+      $("stopBtn").style.display = "none";
       statusText.textContent = "✅ " + d.clips.length + " clips ready!";
       $("progHint").textContent = "";
       go.disabled = false; $("goFile").disabled = !uploadId;
       renderClips(d.clips);
       initTool(); // refresh usage counter
+    } else if (d.status === "cancelled") {
+      clearInterval(creepTimer); creepTimer = null;
+      spin.style.display = "none";
+      $("stopBtn").style.display = "none";
+      statusText.innerHTML = '<span style="color:var(--muted)">■ Stopped — you were not charged for this run.</span>';
+      $("progHint").textContent = "";
+      go.disabled = false; $("goFile").disabled = !uploadId;
+      currentJobId = null;
+      initTool(); // usage was refunded — refresh the counter
     } else {
       fail(d.error || "Something went wrong", d.errorCode, d.logs);
     }
@@ -1071,6 +1088,7 @@ function renderClips(clips) {
 function fail(msg, code, logs) {
   clearInterval(creepTimer); creepTimer = null;
   spin.style.display = "none";
+  $("stopBtn").style.display = "none";
   $("progWrap").style.display = "none";
   $("errBox").style.display = "block";
   $("errMsg").textContent = msg;
@@ -1292,6 +1310,17 @@ function showLocalPreview(objUrl, name) {
 
 $("goFile").addEventListener("click", () => start(true));
 $("goPodcast").addEventListener("click", () => start(false)); // episode URL is in urlInput
+
+document.getElementById("stopBtn").addEventListener("click", async () => {
+  if (!currentJobId) return;
+  const btn = $("stopBtn");
+  btn.disabled = true; btn.textContent = "Stopping…";
+  statusText.textContent = "Stopping…";
+  try {
+    await fetch(`/api/jobs/${currentJobId}/cancel`, { method: "POST" });
+  } catch (_) { /* the poll will reflect it either way */ }
+  setTimeout(() => { btn.disabled = false; btn.textContent = "Stop"; }, 3000);
+});
 
 initTool();
 </script>

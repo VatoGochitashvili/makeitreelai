@@ -44,16 +44,40 @@ const FFMPEG = pickBin("ffmpeg");
 const FFPROBE = pickBin("ffprobe");
 
 // --- small helper: run a shell command and capture output ---
+// Every child process is registered against the running job so a cancel can
+// actually kill ffmpeg/yt-dlp instead of waiting for them to finish.
+const jobCtx = new AsyncLocalStorage();
+export function withJob(ctx, body) { return jobCtx.run(ctx, body); }
+function ctx() { return jobCtx.getStore(); }
+
+export class Cancelled extends Error {
+  constructor() { super("Cancelled by user."); this.name = "Cancelled"; }
+}
+function throwIfCancelled() {
+  if (ctx()?.signal?.aborted) throw new Cancelled();
+}
+
 function run(cmd, args, { onLog } = {}) {
+  throwIfCancelled();
   return new Promise((resolve, reject) => {
     const p = spawn(cmd, args);
+    const c = ctx();
+    c?.children?.add(p);
+    const onAbort = () => { try { p.kill("SIGKILL"); } catch {} };
+    c?.signal?.addEventListener("abort", onAbort, { once: true });
+    const cleanup = () => {
+      c?.children?.delete(p);
+      c?.signal?.removeEventListener("abort", onAbort);
+    };
     let stderr = "";
     p.stdout.on("data", (d) => onLog && onLog(d.toString()));
     p.stderr.on("data", (d) => { stderr += d.toString(); onLog && onLog(d.toString()); });
-    p.on("error", reject);
-    p.on("close", (code) =>
-      code === 0 ? resolve() : reject(new Error(`${cmd} exited ${code}: ${stderr.slice(-500)}`))
-    );
+    p.on("error", (e) => { cleanup(); reject(e); });
+    p.on("close", (code) => {
+      cleanup();
+      if (c?.signal?.aborted) return reject(new Cancelled());
+      code === 0 ? resolve() : reject(new Error(`${cmd} exited ${code}: ${stderr.slice(-500)}`));
+    });
   });
 }
 
@@ -206,6 +230,7 @@ async function transcribeFile(file) {
   const t0 = Date.now();
   const mb = ((await fs.stat(file)).size / 1e6).toFixed(1);
   aiLog(`  🤖 Whisper (whisper-1): uploading ${mb} MB…`);
+  throwIfCancelled();
   const res = await openai().audio.transcriptions.create({
     file: createReadStream(file),
     model: "whisper-1",
@@ -213,7 +238,7 @@ async function transcribeFile(file) {
     // Word timings are what make animated, karaoke-style captions possible.
     // Same call, same cost — we just ask for more detail.
     timestamp_granularities: ["segment", "word"],
-  });
+  }, { signal: ctx()?.signal });
   const mins = (res.duration || 0) / 60;
   aiLog(`  🤖 Whisper done in ${((Date.now() - t0) / 1000).toFixed(1)}s — ` +
         `${(res.segments || []).length} segments, ${(res.words || []).length} words, ` +
@@ -545,7 +570,7 @@ ${transcript}`;
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" },
     temperature: 0.4,
-  });
+  }, { signal: ctx()?.signal });
 
   const u = completion.usage || {};
   aiLog(`  🤖 GPT done in ${((Date.now() - gptT0) / 1000).toFixed(1)}s — ` +
@@ -832,11 +857,12 @@ export async function synthSpeech(text, voice) {
   const ttsT0 = Date.now();
   aiLog(`  🤖 TTS (gpt-4o-mini-tts, voice "${voice || "alloy"}"): ${text.length} chars, ` +
         `~$${((text.length / 1000) * PRICE.ttsPer1k).toFixed(4)}`);
+  throwIfCancelled();
   const res = await openai().audio.speech.create({
     model: "gpt-4o-mini-tts",
     voice: voice || "alloy",
     input: text,
-  });
+  }, { signal: ctx()?.signal });
   return Buffer.from(await res.arrayBuffer());
 }
 
@@ -939,6 +965,7 @@ export async function makeClips(url, log = () => {}, opts = {}) {
     const isAudioOnly = twoPhase ? false : !(await hasVideoStream(video));
     if (isAudioOnly) log("Audio-only source — clips will be rendered as audiograms.");
 
+    throwIfCancelled();
     progress("transcribe", 30);
     // The audio we downloaded is already trimmed to the range, so don't trim twice;
     // shift its timestamps back onto the source timeline instead.
@@ -954,11 +981,13 @@ export async function makeClips(url, log = () => {}, opts = {}) {
       segments = r.segments; words = r.words;
     }
     if (!segments.length) throw new Error("No speech found to transcribe.");
+    throwIfCancelled();
     progress("moments", 56);
     const moments = await selectMoments(segments, log, maxClips, lengthPref);
 
     const results = [];
     for (let i = 0; i < moments.length; i++) {
+      throwIfCancelled();
       progress("render", 60 + Math.round((i / Math.max(1, moments.length)) * 38), {
         current: i + 1, total: moments.length,
       });

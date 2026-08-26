@@ -110,6 +110,14 @@ export function getUsage(user) {
   if (!user.usage || user.usage.month !== m) user.usage = { month: m, videos: 0 };
   return user.usage;
 }
+// Cancelling a run gives the monthly allowance back.
+export function refundVideoUsage(user) {
+  const u = getUsage(user);
+  u.videos = Math.max(0, u.videos - 1);
+  persist();
+  return u;
+}
+
 export function bumpVideoUsage(user) {
   const u = getUsage(user);
   u.videos += 1;

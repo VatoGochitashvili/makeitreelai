@@ -274,6 +274,14 @@ section.block { padding: 90px 0; }
 }
 .panel.show { display: block; }
 .status { display: flex; align-items: center; gap: 10px; font-weight: 600; margin-bottom: 12px; }
+.stop-btn {
+  margin-left: auto; background: rgba(255,122,138,.12); border: 1px solid rgba(255,122,138,.45);
+  color: #ff9aa6; border-radius: 100px; padding: 5px 14px; cursor: pointer;
+  font: 700 12.5px Inter, sans-serif; transition: background .15s, border-color .15s;
+}
+.stop-btn:hover:not(:disabled) { background: rgba(255,122,138,.22); border-color: #ff7a8a; }
+.stop-btn:disabled { opacity: .6; cursor: default; }
+
 .spinner {
   width: 16px; height: 16px; border: 2px solid var(--line); border-top-color: var(--cyan);
   border-radius: 50%; animation: spin .8s linear infinite;

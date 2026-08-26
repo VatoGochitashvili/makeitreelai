@@ -4,9 +4,9 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
-import { makeClips, synthSpeech, probeVideoMeta, probeDurationSec, withAiLogger } from "./src/pipeline.js";
+import { makeClips, synthSpeech, probeVideoMeta, probeDurationSec, withAiLogger, withJob, Cancelled } from "./src/pipeline.js";
 import { createWriteStream } from "node:fs";
-import { authRouter, attachUser, getUsage, bumpVideoUsage } from "./src/auth.js";
+import { authRouter, attachUser, getUsage, bumpVideoUsage, refundVideoUsage } from "./src/auth.js";
 import { schedulerRouter } from "./src/scheduler.js";
 import { reelsRouter, addReels } from "./src/reels.js";
 import { planOf, VOICE_IDS } from "./src/plans.js";
@@ -216,6 +216,9 @@ app.post("/api/clip", async (req, res) => {
     id, logs: [], status: "running", clips: [], error: null,
     stage: "queued", progress: 0, detail: null, errorCode: null,
   };
+  job.abort = new AbortController();
+  job.children = new Set();
+  job.userId = user.id;
   console.log(`\n▶ [${id.slice(0, 6)}] new job — ${user.email} — ${sourceFile ? "uploaded file" : url}`);
   jobs.set(id, job);
   res.json({ jobId: id });
@@ -236,7 +239,9 @@ app.post("/api/clip", async (req, res) => {
 
   try {
     // Scope model-call logging to this job so concurrent runs don't mix.
-    const { workDir, clips } = await withAiLogger(log, () => makeClips(cleanUrl, log, {
+    const { workDir, clips } = await withJob(
+      { signal: job.abort.signal, children: job.children },
+      () => withAiLogger(log, () => makeClips(cleanUrl, log, {
       maxClips: chosenClips,
       resolution: plan.resolution,
       voiceover: wantVoiceover,
@@ -252,7 +257,7 @@ app.post("/api/clip", async (req, res) => {
       externalDownload: (!sourceFile && workerEnabled() && !isDirectMedia(normalizeUrl(cleanUrl).url))
         ? (u, dir, l) => requestDownload(u, dir, l)
         : null,
-    }));
+    })));
     // move clips into the public folder so the browser can play/download them
     const outDir = path.join(CLIPS_DIR, id);
     await fs.mkdir(outDir, { recursive: true });
@@ -280,6 +285,15 @@ app.post("/api/clip", async (req, res) => {
       fs.rm(up.file, { force: true }).catch(() => {});
     }
   } catch (err) {
+    if (err instanceof Cancelled || job.abort.signal.aborted) {
+      job.status = "cancelled";
+      job.error = "Cancelled — you were not charged for this run.";
+      job.stage = "cancelled";
+      // The quota was taken up-front to cap spend; give it back.
+      refundVideoUsage(user);
+      console.log(`✖ [${id.slice(0, 6)}] cancelled by user — quota refunded`);
+      return;
+    }
     job.status = "error";
     job.error = err.message;
     // Short code the user can quote when reporting a problem; the full detail
@@ -412,6 +426,22 @@ app.get("/api/version", (_req, res) => res.json({ build: BUILD, started: STARTED
 // Is a download helper connected? (drives the UI hint)
 app.get("/api/worker-status", (req, res) => {
   res.json({ enabled: workerEnabled(), online: workerOnline() });
+});
+
+// Stop a running job. Kills the tools mid-flight and aborts API calls, so
+// cancelling early genuinely avoids the spend.
+app.post("/api/jobs/:id/cancel", (req, res) => {
+  const job = jobs.get(req.params.id);
+  if (!job) return res.status(404).json({ error: "Job not found." });
+  if (!req.user || job.userId !== req.user.id) {
+    return res.status(403).json({ error: "That isn't your job." });
+  }
+  if (job.status !== "running") return res.json({ ok: true, status: job.status });
+
+  job.abort.abort();
+  for (const child of job.children) { try { child.kill("SIGKILL"); } catch {} }
+  job.logs.push({ t: Date.now(), msg: "Cancelled by user." });
+  res.json({ ok: true, status: "cancelling" });
 });
 
 // Poll job status + logs
