@@ -370,11 +370,61 @@ async function transcribe(videoPath, workDir, log, range = null) {
 
 // Clip-length presets the user can pick before generating.
 export const LENGTHS = {
-  auto: { label: "Auto", range: "15-60 seconds" },
-  short: { label: "Short (15–30s)", range: "15-30 seconds" },
-  medium: { label: "Medium (30–45s)", range: "30-45 seconds" },
-  long: { label: "Long (45–60s)", range: "45-60 seconds" },
+  auto:   { label: "Auto",             range: "20-75 seconds", min: 20, max: 75 },
+  short:  { label: "Short (15–30s)",   range: "15-32 seconds", min: 15, max: 32 },
+  medium: { label: "Medium (30–45s)",  range: "28-50 seconds", min: 28, max: 50 },
+  long:   { label: "Long (45–60s)",    range: "45-75 seconds", min: 45, max: 75 },
 };
+
+// The model's timestamps are approximations, so a clip often starts mid-word
+// and ends mid-thought. Snap each pick to real speech boundaries from the
+// transcript, grow it until it's long enough to make sense, and trim it back
+// if it overruns. This is what turns "a fragment" into "a clip".
+function refineMoments(clips, segments, min, max, log) {
+  if (!segments.length) return clips;
+  const out = [];
+
+  for (const c of clips) {
+    // First segment that is still speaking at the proposed start.
+    let i = segments.findIndex((s) => s.end > c.start);
+    if (i === -1) i = 0;
+    // First segment that finishes at or after the proposed end.
+    let j = segments.findIndex((s) => s.end >= c.end);
+    if (j === -1) j = segments.length - 1;
+    if (j < i) j = i;
+
+    const dur = () => segments[j].end - segments[i].start;
+
+    // Too short to stand alone: keep the hook where it is and let the thought
+    // finish; only reach backwards if there's nothing left ahead.
+    while (dur() < min && j < segments.length - 1) j++;
+    while (dur() < min && i > 0) i--;
+    // Overran: pull the end back to the previous sentence boundary.
+    while (dur() > max && j > i) j--;
+
+    const start = segments[i].start;
+    const end = segments[j].end;
+    if (end - start < Math.max(8, min * 0.6)) continue; // genuinely nothing there
+
+    out.push({ ...c, start, end });
+  }
+
+  // Snapping can collapse two different picks onto the same sentences, which
+  // would ship the viewer duplicate clips. Keep the first, drop heavy overlaps.
+  out.sort((a, b) => a.start - b.start);
+  const unique = [];
+  for (const c of out) {
+    const clash = unique.find((u) => {
+      const overlap = Math.min(u.end, c.end) - Math.max(u.start, c.start);
+      return overlap > 0 && overlap > 0.5 * Math.min(u.end - u.start, c.end - c.start);
+    });
+    if (!clash) unique.push(c);
+  }
+
+  const dropped = clips.length - unique.length;
+  if (dropped > 0) log(`  (skipped ${dropped} moment${dropped > 1 ? "s" : ""}: too short or overlapping)`);
+  return unique;
+}
 
 // --- 3. ask the LLM to pick the best clip-worthy moments ---
 async function selectMoments(segments, log, maxClips = MAX_CLIPS, lengthPref = "auto") {
@@ -384,14 +434,32 @@ async function selectMoments(segments, log, maxClips = MAX_CLIPS, lengthPref = "
     .map((s) => `[${s.start.toFixed(1)}-${s.end.toFixed(1)}] ${s.text.trim()}`)
     .join("\n");
 
-  const range = (LENGTHS[lengthPref] || LENGTHS.auto).range;
-  const prompt = `You are an expert short-form video editor. Below is a timestamped transcript of a long video.
-Pick the ${maxClips} BEST standalone moments to turn into vertical short clips (${range} each).
-Prefer strong hooks, punchlines, surprising insights, emotional or quotable lines.
-Each clip must start and end on a natural sentence boundary.
+  const L = LENGTHS[lengthPref] || LENGTHS.auto;
+  const prompt = `You are an expert short-form video editor. Below is a timestamped transcript of a longer video.
+
+Choose the ${maxClips} best moments to become standalone vertical clips.
+
+A good clip is a COMPLETE THOUGHT, not a fragment. Each one must:
+1. Start exactly where a sentence starts — never mid-sentence, and never on a
+   filler connective ("and so", "but yeah", "anyway"). The first line has to
+   work as a hook on its own.
+2. Contain the whole idea: the setup AND the payoff. If someone asks a
+   question, include the answer. If a story starts, include how it ends.
+3. End after the point lands — on the last sentence of that thought, not
+   partway into the next topic.
+4. Make sense to a viewer who has not seen the rest of the video. No dangling
+   "he" or "that thing" with no referent.
+5. Be ${L.min}-${L.max} seconds long. If a thought is shorter than ${L.min}s,
+   include the surrounding sentences that complete it, or choose a different
+   moment. Never return anything under ${L.min} seconds.
+
+Prefer moments with a strong hook, a surprising insight, a punchline, a
+concrete story, or a quotable line.
+
+Use the timestamps exactly as given in the transcript for start and end.
 
 Return ONLY valid JSON in this exact shape:
-{"clips":[{"start":<seconds>,"end":<seconds>,"title":"<catchy title>","hook":"<the opening line>","virality":<1-100>}]}
+{"clips":[{"start":<seconds>,"end":<seconds>,"title":"<catchy title, max 8 words>","hook":"<the opening sentence>","virality":<1-100>}]}
 
 Transcript:
 ${transcript}`;
@@ -409,10 +477,14 @@ ${transcript}`;
   } catch {
     throw new Error("AI returned invalid JSON while selecting moments.");
   }
-  const clips = (data.clips || [])
+  const raw = (data.clips || [])
     .filter((c) => typeof c.start === "number" && typeof c.end === "number" && c.end > c.start)
     .slice(0, maxClips);
-  log(`AI selected ${clips.length} moments.`);
+
+  const clips = refineMoments(raw, segments, L.min, L.max, log);
+  const mmss = (t) => `${Math.floor(t / 60)}:${String(Math.round(t % 60)).padStart(2, "0")}`;
+  log(`AI selected ${clips.length} moments (${clips.map((c) => Math.round(c.end - c.start) + "s").join(", ")}).`);
+  clips.forEach((c, i) => log(`  ${i + 1}. ${mmss(c.start)}–${mmss(c.end)} "${c.title || "untitled"}"`));
   return clips;
 }
 
