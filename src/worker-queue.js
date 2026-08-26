@@ -52,12 +52,19 @@ function checkToken(req, res) {
   return true;
 }
 
+// If a helper claims a job and then dies or restarts, the job must not be
+// stranded — put it back after a grace period so another poll picks it up.
+const CLAIM_GRACE_MS = 90 * 1000;
+
 // The helper polls this for something to download.
 workerRouter.get("/worker/next", (req, res) => {
   if (!checkToken(req, res)) return;
+  const now = Date.now();
   for (const job of pending.values()) {
-    if (job.status === "pending") {
+    const stale = job.status === "claimed" && now - job.claimedAt > CLAIM_GRACE_MS;
+    if (job.status === "pending" || stale) {
       job.status = "claimed";
+      job.claimedAt = now;
       return res.json({ id: job.id, url: job.url });
     }
   }
