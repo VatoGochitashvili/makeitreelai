@@ -431,13 +431,36 @@ function refineMoments(clips, segments, min, max, log) {
     if (j < i) j = i;
 
     const dur = () => segments[j].end - segments[i].start;
+    // Whisper's segments are arbitrary chunks, not sentences — so a clip could
+    // still end mid-thought. Use the punctuation in the text to find where
+    // sentences actually finish and start.
+    const endsSentence = (n) => /[.!?]["')\]]?\s*$/.test((segments[n]?.text || "").trim());
+    const startsSentence = (n) => n === 0 || endsSentence(n - 1);
 
     // Too short to stand alone: keep the hook where it is and let the thought
     // finish; only reach backwards if there's nothing left ahead.
     while (dur() < min && j < segments.length - 1) j++;
     while (dur() < min && i > 0) i--;
-    // Overran: pull the end back to the previous sentence boundary.
+    // Overran: pull the end back.
     while (dur() > max && j > i) j--;
+
+    // Land the start on the beginning of a sentence.
+    let gi = i;
+    while (gi < j && !startsSentence(gi)) gi++;
+    if (gi < j && segments[j].end - segments[gi].start >= min * 0.8) i = gi;
+
+    // Land the end on the end of a sentence — extend a little past `max` if
+    // that's what it takes to finish the thought, rather than cutting it off.
+    let gj = j;
+    const hardMax = max * 1.25;
+    while (gj < segments.length - 1 && !endsSentence(gj) &&
+           segments[gj].end - segments[i].start < hardMax) gj++;
+    if (endsSentence(gj)) j = gj;
+    else { // nothing ends cleanly ahead — fall back to the last one that does
+      let bk = j;
+      while (bk > i && !endsSentence(bk)) bk--;
+      if (bk > i && segments[bk].end - segments[i].start >= min * 0.7) j = bk;
+    }
 
     const start = segments[i].start;
     const end = segments[j].end;
@@ -604,21 +627,42 @@ function buildAss(words, { W, H, style, position, size }) {
   let group = [];
   const flush = () => {
     if (!group.length) return;
-    const start = group[0].start;
-    const end = group[group.length - 1].end;
-    const text = group.map((w) => w.word.trim()).join(" ").toUpperCase()
-      .replace(/[{}\\]/g, "");   // ASS control chars
-    lines.push(`Dialogue: 0,${assTime(start)},${assTime(end)},Cap,,0,0,0,,${text}`);
+    lines.push({
+      start: group[0].start,
+      end: group[group.length - 1].end,
+      text: group.map((w) => w.word.trim()).join(" ").toUpperCase()
+        .replace(/[{}\\]/g, ""),   // ASS control chars
+    });
     group = [];
   };
   for (let i = 0; i < words.length; i++) {
     group.push(words[i]);
     const next = words[i + 1];
     const gap = next ? next.start - words[i].end : 0;
-    const long = group.map((w) => w.word).join(" ").length > 18;
-    if (group.length >= 3 || long || gap > 0.35 || !next) flush();
+    const long = group.map((w) => w.word).join(" ").length > 20;
+    // Break on a real pause, a full line, or the end.
+    if (group.length >= 3 || long || gap > 0.45 || !next) flush();
   }
-  return header + "\n" + lines.join("\n") + "\n";
+
+  // Fix two things that make captions feel "off" from the voice:
+  //  - very fast phrases flashing by unreadably
+  //  - gaps where nothing is shown between phrases
+  const MIN_SHOW = 0.5;
+  for (let i = 0; i < lines.length; i++) {
+    const cur = lines[i];
+    const next = lines[i + 1];
+    // Hold a short phrase longer, but never past the next one's start.
+    if (cur.end - cur.start < MIN_SHOW) {
+      cur.end = next ? Math.min(cur.start + MIN_SHOW, next.start) : cur.start + MIN_SHOW;
+      if (cur.end <= cur.start) cur.end = cur.start + 0.25;
+    }
+    // Close small gaps so text doesn't blink out between phrases.
+    if (next && next.start - cur.end < 0.25) cur.end = next.start;
+  }
+
+  const events = lines.map((l) =>
+    `Dialogue: 0,${assTime(l.start)},${assTime(l.end)},Cap,,0,0,0,,${l.text}`);
+  return header + "\n" + events.join("\n") + "\n";
 }
 
 // 9:16 dimensions for a given target resolution (long edge height).

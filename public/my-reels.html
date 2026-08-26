@@ -39,7 +39,11 @@
       <h1>My Reels</h1>
       <p class="muted" id="sub">Every clip you've generated, in one place.</p>
     </div>
-    <a class="btn" href="/#try">+ New clips</a>
+    <div style="display:flex;gap:10px;align-items:center">
+      <span class="muted" id="usage" style="font-size:13px"></span>
+      <button class="btn ghost" id="clearAll">Delete all</button>
+      <a class="btn" href="/#try">+ New clips</a>
+    </div>
   </header>
 
   <div class="clips" id="reels"></div>
@@ -98,11 +102,30 @@ async function load() {
     location.href = "/account.html#scheduler";
   }));
   $("reels").querySelectorAll(".reel-del").forEach((b) => b.addEventListener("click", async () => {
-    if (!confirm("Remove this clip from your library?")) return;
+    if (!confirm("Delete this clip? The video file is removed from the server too.")) return;
     const r = await fetch("/api/reels/" + b.dataset.del, { method: "DELETE" });
-    if (r.ok) load();
+    if (r.ok) {
+      const d = await r.json().catch(() => ({}));
+      if (d.freedBytes) console.log(`freed ${(d.freedBytes / 1e6).toFixed(1)} MB`);
+      load();
+    }
   }));
+
+  // how much disk the library is using
+  fetch("/api/reels/usage").then((r) => r.json()).then((u) => {
+    if (u && u.bytes != null) $("usage").textContent = `${(u.bytes / 1e6).toFixed(0)} MB used`;
+  }).catch(() => {});
 }
+
+$("clearAll").addEventListener("click", async () => {
+  if (!confirm("Delete ALL your clips? The video files are removed from the server too. This cannot be undone.")) return;
+  const r = await fetch("/api/reels", { method: "DELETE" });
+  if (r.ok) {
+    const d = await r.json().catch(() => ({}));
+    alert(`Deleted ${d.removed || 0} clips, freed ${((d.freedBytes || 0) / 1e6).toFixed(0)} MB.`);
+    load();
+  }
+});
 
 load();
 </script>
