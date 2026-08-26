@@ -560,7 +560,7 @@ async function initTool() {
   }
 
   renderCapPreview(); updateSetSum();
-  if (urlInput.value.trim()) loadPreview(urlInput.value.trim());
+  if (urlInput.value.trim()) loadPreview(normalizeLink(urlInput.value));
 }
 
 // ---------- generation settings ----------
@@ -877,7 +877,7 @@ async function loadPreview(u) {
 
 urlInput.addEventListener("input", () => {
   clearTimeout(previewTimer);
-  previewTimer = setTimeout(() => loadPreview(urlInput.value.trim()), 400);
+  previewTimer = setTimeout(() => loadPreview(normalizeLink(urlInput.value)), 400);
 });
 
 function renderMeta() {
@@ -898,8 +898,15 @@ function renderMeta() {
 go.addEventListener("click", () => start(false));
 urlInput.addEventListener("keydown", (e) => { if (e.key === "Enter") start(false); });
 
+// Users paste "youtube.com/watch?v=..." all the time — treat it like a browser does.
+function normalizeLink(v) {
+  const t = String(v || "").trim();
+  if (!t) return "";
+  return /^https?:\/\//i.test(t) ? t : "https://" + t;
+}
+
 async function start(fromUpload) {
-  const url = urlInput.value.trim();
+  const url = normalizeLink(urlInput.value);
 
   // Say what's missing rather than doing nothing.
   if (fromUpload && !uploadId) return toolHint("Choose a file first — then press Make my reels.");

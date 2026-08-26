@@ -140,6 +140,9 @@ app.post("/api/clip", async (req, res) => {
 
   const { url, uploadId, voiceover: voiceoverReq, voice, caption, length, clips: clipsReq, range } = req.body || {};
 
+  // Accept "youtube.com/watch?v=..." the way a browser would.
+  const cleanUrl = url && !/^https?:\/\//i.test(url) ? "https://" + String(url).trim() : url;
+
   // Either an uploaded file (reliable) or a link (can be blocked by the source).
   let sourceFile = null;
   if (uploadId) {
@@ -148,8 +151,13 @@ app.post("/api/clip", async (req, res) => {
       return res.status(400).json({ error: "That upload has expired — please upload the file again." });
     }
     sourceFile = up.file;
-  } else if (!url || !/^https?:\/\//.test(url)) {
+  } else if (!url) {
     return res.status(400).json({ error: "Paste a video link or upload a file." });
+  } else if (!/^https?:\/\//i.test(url) && !/^[\w-]+(\.[\w-]+)+\//.test(url)) {
+    // Be specific: an empty box and a malformed link are different problems.
+    return res.status(400).json({
+      error: `That doesn't look like a video link: "${String(url).slice(0, 60)}". Paste the full URL from your browser's address bar.`,
+    });
   }
   if (!process.env.OPENAI_API_KEY) {
     return res.status(500).json({ error: "Server is missing OPENAI_API_KEY. Add it to your .env file." });
@@ -218,7 +226,7 @@ app.post("/api/clip", async (req, res) => {
   };
 
   try {
-    const { workDir, clips } = await makeClips(url, log, {
+    const { workDir, clips } = await makeClips(cleanUrl, log, {
       maxClips: chosenClips,
       resolution: plan.resolution,
       voiceover: wantVoiceover,
@@ -230,7 +238,7 @@ app.post("/api/clip", async (req, res) => {
       onProgress,
       // With a helper connected, links are fetched on the user's own machine
       // (a residential IP YouTube trusts) instead of from this server.
-      externalDownload: (!sourceFile && workerEnabled() && !isDirectMedia(normalizeUrl(url).url))
+      externalDownload: (!sourceFile && workerEnabled() && !isDirectMedia(normalizeUrl(cleanUrl).url))
         ? (u, dir, l) => requestDownload(u, dir, l)
         : null,
     });
@@ -251,7 +259,7 @@ app.post("/api/clip", async (req, res) => {
     job.status = "done";
     job.stage = "done"; job.progress = 100;
     // save this batch to the user's "My Reels" library
-    addReels(user.id, published, url);
+    addReels(user.id, published, cleanUrl);
     // best-effort cleanup of the temp working dir (and the uploaded source)
     fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
     if (uploadId && uploads.has(uploadId)) {
