@@ -118,6 +118,23 @@ export function probeDurationSec(file) {
   });
 }
 
+// zoompan re-times video to whatever fps you give it, so we must feed it the
+// source rate or clips come out shorter than they should be.
+function probeFps(file) {
+  return new Promise((resolve) => {
+    const p = spawn(FFPROBE, ["-v", "error", "-select_streams", "v:0",
+      "-show_entries", "stream=r_frame_rate", "-of", "csv=p=0", file]);
+    let out = "";
+    p.stdout.on("data", (d) => (out += d.toString()));
+    p.on("error", () => resolve(30));
+    p.on("close", () => {
+      const [n, d] = out.trim().split("/").map(Number);
+      const fps = d ? n / d : n;
+      resolve(fps && isFinite(fps) && fps > 0 ? fps : 30);
+    });
+  });
+}
+
 // Some ffmpeg builds ship without libfreetype (no `drawtext` filter). Detect
 // once so we can burn captions when possible and skip them gracefully if not.
 let _drawtext;
@@ -370,7 +387,9 @@ async function transcribe(videoPath, workDir, log, range = null) {
 
 // Clip-length presets the user can pick before generating.
 export const LENGTHS = {
-  auto:   { label: "Auto",             range: "20-75 seconds", min: 20, max: 75 },
+  // Auto lets each clip be as long as its idea needs — a punchline can be 20s
+  // while a story runs two minutes, which is what makes a set feel natural.
+  auto:   { label: "Auto",             range: "20-120 seconds", min: 20, max: 120, varied: true },
   short:  { label: "Short (15–30s)",   range: "15-32 seconds", min: 15, max: 32 },
   medium: { label: "Medium (30–45s)",  range: "28-50 seconds", min: 28, max: 50 },
   long:   { label: "Long (45–60s)",    range: "45-75 seconds", min: 45, max: 75 },
@@ -451,7 +470,17 @@ A good clip is a COMPLETE THOUGHT, not a fragment. Each one must:
    "he" or "that thing" with no referent.
 5. Be ${L.min}-${L.max} seconds long. If a thought is shorter than ${L.min}s,
    include the surrounding sentences that complete it, or choose a different
-   moment. Never return anything under ${L.min} seconds.
+   moment. Never return anything under ${L.min} seconds.${L.varied ? `
+6. VARY the lengths — this matters. Do NOT return clips that are all roughly
+   the same length, and do not default to the minimum. Aim for a spread:
+     - some short and punchy (20-35s): a single sharp point or punchline
+     - some medium (40-70s): a point with its explanation
+     - at least one long (75-120s) if the transcript contains a full story,
+       argument, or explanation worth hearing end to end
+   Let each clip run as long as its idea genuinely needs.` : ""}
+
+Spread your picks across the whole transcript rather than clustering them in
+one section.
 
 Prefer moments with a strong hook, a surprising insight, a punchline, a
 concrete story, or a quotable line.
@@ -640,7 +669,7 @@ async function cutAudiogram(srcPath, clip, index, workDir, resolution, caption, 
   return out;
 }
 
-async function cutClip(videoPath, clip, index, workDir, resolution, caption, log, words) {
+async function cutClip(videoPath, clip, index, workDir, resolution, caption, log, words, motion = "subtle") {
   const out = path.join(workDir, `clip_${index + 1}.mp4`);
   const dur = Math.max(1, clip.end - clip.start);
   const { W, H } = dims(resolution);
@@ -662,6 +691,19 @@ async function cutClip(videoPath, clip, index, workDir, resolution, caption, log
     `scale=${W}:${H}:force_original_aspect_ratio=increase`,
     `crop=${W}:${H}`,
   ];
+
+  // A slow, continuous push-in. Static centre crops read as flat; a gentle
+  // zoom keeps the frame alive the way edited shorts do. Applied before the
+  // captions so the text stays pinned and crisp.
+  if (motion !== "none") {
+    const fps = await probeFps(videoPath);
+    const total = Math.max(1, Math.round(dur * fps));
+    const amount = motion === "strong" ? 0.18 : 0.09;
+    filters.push(
+      `zoompan=z='min(1+${amount}*on/${total},${(1 + amount).toFixed(2)})'` +
+      `:d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=${W}x${H}:fps=${fps.toFixed(4)}`
+    );
+  }
   // Preferred: animated word-timed captions burned from an .ass file.
   let assPath = null;
   if (style.draw && words && words.length && await hasSubtitles()) {
@@ -783,6 +825,7 @@ export async function makeClips(url, log = () => {}, opts = {}) {
   const caption = opts.caption || { style: "bold", position: "top", size: "medium" };
   const lengthPref = opts.length || "auto";
   const range = opts.range || null; // { start, end } seconds, or null for the whole video
+  const motion = ["none", "subtle", "strong"].includes(opts.motion) ? opts.motion : "subtle";
   // Reports the current phase so the UI can show a real progress bar instead
   // of raw tool output. pct is an overall 0-100 estimate.
   const progress = opts.onProgress || (() => {});
@@ -848,13 +891,13 @@ export async function makeClips(url, log = () => {}, opts = {}) {
         log(`Fetching clip ${i + 1} of ${moments.length} from the source…`);
         const sec = await downloadSection(url, workDir, log, moments[i].start, moments[i].end, i);
         const local = { ...moments[i], start: 0, end: Math.max(1, moments[i].end - moments[i].start) };
-        file = await cutClip(sec, local, i, workDir, resolution, caption, log,
+        file = await cutClip(sec, local, i, workDir, resolution, caption, log, 
           // shift words to be relative to this section
-          words.map((w) => ({ ...w, start: w.start - moments[i].start, end: w.end - moments[i].start })));
+          words.map((w) => ({ ...w, start: w.start - moments[i].start, end: w.end - moments[i].start })), motion);
       } else if (isAudioOnly) {
         file = await cutAudiogram(video, moments[i], i, workDir, resolution, caption, log);
       } else {
-        file = await cutClip(video, moments[i], i, workDir, resolution, caption, log, words);
+        file = await cutClip(video, moments[i], i, workDir, resolution, caption, log, words, motion);
       }
       let narrated = false;
       if (wantVoiceover) {

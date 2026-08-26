@@ -240,7 +240,7 @@
             <div class="set-field">
               <label for="setLength">Clip length</label>
               <select id="setLength" class="voice-select">
-                <option value="auto">Auto (15–60s)</option>
+                <option value="auto">Auto — varied (20s–2min)</option>
                 <option value="short">Short (15–30s)</option>
                 <option value="medium">Medium (30–45s)</option>
                 <option value="long">Long (45–60s)</option>
@@ -261,6 +261,14 @@
                 <option value="top">Top</option>
                 <option value="center">Center</option>
                 <option value="bottom">Bottom</option>
+              </select>
+            </div>
+            <div class="set-field">
+              <label for="setMotion">Camera motion</label>
+              <select id="setMotion" class="voice-select">
+                <option value="subtle" selected>Smooth zoom (recommended)</option>
+                <option value="strong">Strong zoom</option>
+                <option value="none">Static</option>
               </select>
             </div>
             <div class="set-field">
@@ -541,7 +549,7 @@ async function initTool() {
       ME.plan.maxUploadMB >= 1024 ? (ME.plan.maxUploadMB / 1024) + " GB" : ME.plan.maxUploadMB + " MB"}`;
   }
 
-  ["setClips", "setLength", "setCapStyle", "setCapPos", "setCapSize"].forEach((id) =>
+  ["setClips", "setLength", "setCapStyle", "setCapPos", "setCapSize", "setMotion"].forEach((id) =>
     $(id).addEventListener("change", () => { renderCapPreview(); updateSetSum(); }));
 
   // Re-apply anything chosen before signing up.
@@ -556,6 +564,7 @@ async function initTool() {
     }
     if (r.voiceover && canVoice) { voToggle.checked = true; voVoice.disabled = false; }
     if (r.voice) voVoice.value = r.voice;
+    if (r.motion) $("setMotion").value = r.motion;
     $("settings").open = true;
   }
 
@@ -569,6 +578,7 @@ function currentSettings() {
     clips: parseInt($("setClips").value, 10),
     length: $("setLength").value,
     caption: { style: $("setCapStyle").value, position: $("setCapPos").value, size: $("setCapSize").value },
+    motion: $("setMotion").value,
     voiceover: !voToggle.disabled && voToggle.checked,
     voice: voVoice.value,
   };
@@ -582,7 +592,7 @@ function currentSettings() {
 function updateSetSum() {
   const s = currentSettings();
   const capLabel = { bold: "Bold", highlight: "Highlight", minimal: "Minimal", none: "No captions" }[s.caption.style];
-  const lenLabel = { auto: "Auto", short: "15–30s", medium: "30–45s", long: "45–60s" }[s.length];
+  const lenLabel = { auto: "Auto (varied)", short: "15–30s", medium: "30–45s", long: "45–75s" }[s.length];
   const rangeLabel = s.range ? ` · ✂️ ${fmtTime(s.range.start)}–${fmtTime(s.range.end)}` : "";
   $("setSum").textContent = `${s.clips} clip${s.clips > 1 ? "s" : ""} · ${lenLabel} · ${capLabel}${s.voiceover ? " · 🔊 Voiceover" : ""}${rangeLabel}`;
 }

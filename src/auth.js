@@ -8,7 +8,9 @@ import {
   randomBytes, randomUUID, scryptSync, timingSafeEqual, createHmac,
 } from "node:crypto";
 import { PLANS, planOf } from "./plans.js";
-import { readJSON, writeJSON } from "./store.js";
+import { readJSON, writeJSON, DATA_DIR } from "./store.js";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import path from "node:path";
 
 const users = new Map(); // email(lowercased) -> { id, name, email, plan, salt, hash, createdAt, usage, connections }
 // Restore persisted accounts.
@@ -22,9 +24,24 @@ const VALID_PLANS = new Set(["free", "creator", "pro"]);
 const COOKIE = "mir_session";
 const MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
-// A per-process secret is fine for the in-memory MVP; set SESSION_SECRET to
-// keep sessions valid across restarts.
-const SECRET = process.env.SESSION_SECRET || randomBytes(32).toString("hex");
+// Signs session cookies. Generating a fresh one each boot silently logged
+// everyone out on every restart, so persist it alongside the other data.
+// SESSION_SECRET (env) still wins when set — that's what production should use.
+function loadSecret() {
+  if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
+  const file = path.join(DATA_DIR, "session-secret");
+  try {
+    const existing = readFileSync(file, "utf8").trim();
+    if (existing) return existing;
+  } catch { /* first run */ }
+  const fresh = randomBytes(32).toString("hex");
+  try {
+    mkdirSync(DATA_DIR, { recursive: true });
+    writeFileSync(file, fresh, { mode: 0o600 });
+  } catch { /* not writable — sessions just won't survive a restart */ }
+  return fresh;
+}
+const SECRET = loadSecret();
 
 // ---------- password hashing ----------
 function hashPassword(password, salt = randomBytes(16).toString("hex")) {
