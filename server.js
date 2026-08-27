@@ -6,14 +6,15 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { makeClips, synthSpeech, probeVideoMeta, probeDurationSec, withAiLogger, withJob, Cancelled, FORMATS } from "./src/pipeline.js";
 import { createWriteStream } from "node:fs";
-import { authRouter, attachUser, getUsage, bumpVideoUsage, refundVideoUsage } from "./src/auth.js";
-import { schedulerRouter } from "./src/scheduler.js";
+import { authRouter, attachUser, getUsage, bumpVideoUsage, refundVideoUsage, findUserById } from "./src/auth.js";
+import { schedulerRouter, schedulePost } from "./src/scheduler.js";
 import { reelsRouter, addReels } from "./src/reels.js";
 import { planOf, VOICE_IDS } from "./src/plans.js";
 import { DATA_DIR } from "./src/store.js";
 import { fetchPodcastFeed, normalizeUrl, isDirectMedia } from "./src/sources.js";
 import { workerRouter, workerEnabled, requestDownload, workerOnline } from "./src/worker-queue.js";
 import { backgroundsRouter, loadBackgrounds, findBackground, anyBackground } from "./src/backgrounds.js";
+import { autopilotRouter, initAutopilot } from "./src/autopilot.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -34,6 +35,7 @@ app.use("/api", schedulerRouter);
 app.use("/api", reelsRouter);
 app.use("/api", workerRouter);
 app.use("/api", backgroundsRouter);
+app.use("/api", autopilotRouter);
 await loadBackgrounds();
 
 // finished clips are served from here
@@ -238,18 +240,37 @@ app.post("/api/clip", async (req, res) => {
   // Count this run against the monthly quota up-front (cost control).
   bumpVideoUsage(user);
 
+  const id = startJob(user, {
+    url: cleanUrl, sourceFile, uploadId,
+    maxClips: chosenClips, voiceover: wantVoiceover, voice: chosenVoice,
+    caption: chosenCaption, length: chosenLength, range: chosenRange,
+    motion: chosenMotion, layout: chosenLayout, format: chosenFormat, background,
+  });
+  res.json({ jobId: id });
+});
+
+// Runs one generation job in the background and returns its id immediately.
+// Split out of the route so the podcast autopilot can start a run with no
+// browser involved — nothing here may touch req or res.
+export function startJob(user, o) {
+  const plan = planOf(user.plan);
+  const cleanUrl = o.url;
+  const sourceFile = o.sourceFile || null;
+  const uploadId = o.uploadId || null;
+  const background = o.background || null;
+
   const id = randomUUID();
   const job = {
     id, logs: [], status: "running", clips: [], error: null,
     stage: "queued", progress: 0, detail: null, errorCode: null,
     startedAt: Date.now(), source: sourceFile ? "upload" : cleanUrl,
+    auto: !!o.auto, label: o.label || null,
   };
   job.abort = new AbortController();
   job.children = new Set();
   job.userId = user.id;
-  console.log(`\n▶ [${id.slice(0, 6)}] new job — ${user.email} — ${sourceFile ? "uploaded file" : url}`);
+  console.log(`\n▶ [${id.slice(0, 6)}] new job — ${user.email} — ${sourceFile ? "uploaded file" : cleanUrl}`);
   jobs.set(id, job);
-  res.json({ jobId: id });
 
   const short = id.slice(0, 6);
   const log = (msg) => {
@@ -265,21 +286,22 @@ app.post("/api/clip", async (req, res) => {
     job.detail = detail || null;
   };
 
+  (async () => {
   try {
     // Scope model-call logging to this job so concurrent runs don't mix.
     const { workDir, clips } = await withJob(
       { signal: job.abort.signal, children: job.children },
       () => withAiLogger(log, () => makeClips(cleanUrl, log, {
-      maxClips: chosenClips,
+      maxClips: o.maxClips,
       resolution: plan.resolution,
-      voiceover: wantVoiceover,
-      voice: chosenVoice,
-      caption: chosenCaption,
-      length: chosenLength,
-      range: chosenRange,
-      motion: chosenMotion,
-      layout: chosenLayout,
-      format: chosenFormat,
+      voiceover: o.voiceover,
+      voice: o.voice,
+      caption: o.caption,
+      length: o.length,
+      range: o.range,
+      motion: o.motion,
+      layout: o.layout,
+      format: o.format,
       background: background && { name: background.name, file: background.file, duration: background.duration },
       sourceFile,
       onProgress,
@@ -309,6 +331,7 @@ app.post("/api/clip", async (req, res) => {
     console.log(`✓ [${id.slice(0, 6)}] done — ${published.length} clips`);
     // save this batch to the user's "My Reels" library
     addReels(user.id, published, cleanUrl);
+    if (o.onDone) { try { await o.onDone(published, job); } catch (_) { /* never fail a finished run */ } }
     // best-effort cleanup of the temp working dir (and the uploaded source)
     fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
     if (uploadId && uploads.has(uploadId)) {
@@ -333,7 +356,14 @@ app.post("/api/clip", async (req, res) => {
     job.errorCode = "MIR-" + id.replace(/-/g, "").slice(0, 6).toUpperCase();
     console.error(`[${job.errorCode}] job ${id} failed:`, err.message);
   }
-});
+  })();
+
+  return id;
+}
+
+// Episodes clip themselves once a feed is connected. Started here because it
+// needs startJob, which is defined just above.
+initAutopilot({ startJob, findUser: findUserById, schedulePost });
 
 // Video preview: title, author, thumbnail and — crucially — duration, which
 // the range selector needs. yt-dlp gives the real duration; oEmbed is the

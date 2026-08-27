@@ -101,6 +101,13 @@ function publicUser(u) {
 }
 
 // ---------- monthly usage tracking ----------
+// Look a user up by id — the autopilot works from stored feeds, not sessions,
+// so it has an id and no cookie to resolve it with.
+export function findUserById(id) {
+  for (const u of users.values()) if (u.id === id) return u;
+  return null;
+}
+
 export function monthKey(d = new Date()) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }

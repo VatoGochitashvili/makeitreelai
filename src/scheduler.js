@@ -10,11 +10,36 @@
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { planOf } from "./plans.js";
+import { findUserById } from "./auth.js";
 import { readJSON, writeJSON } from "./store.js";
 
 const posts = readJSON("schedule.json", []); // { id, userId, clipUrl, title, platform, when, status, createdAt }
 const PLATFORMS = new Set(["tiktok", "instagram", "youtube"]);
 function persist() { writeJSON("schedule.json", () => posts); }
+
+// Queue a post without an HTTP request — the autopilot schedules on the
+// user's behalf while they're nowhere near a browser. Returns a result object
+// instead of throwing so one unlinked platform can't abort a whole batch.
+export async function schedulePost(userId, { clipUrl, title, platform, when }) {
+  const user = findUserById(userId);
+  if (!user) return { ok: false, error: "Unknown account." };
+  if (!planOf(user.plan).scheduler) return { ok: false, error: "Scheduling needs a Creator or Pro plan." };
+  if (!PLATFORMS.has(platform)) return { ok: false, error: `Unknown platform "${platform}".` };
+  if (!user.connections || !user.connections[platform]) {
+    return { ok: false, error: `${platform} isn't connected yet.` };
+  }
+  const ts = Date.parse(when);
+  if (!ts || Number.isNaN(ts)) return { ok: false, error: "Invalid time." };
+
+  const post = {
+    id: randomUUID(), userId, clipUrl,
+    title: (title || "Untitled clip").slice(0, 120),
+    platform, when: ts, status: "scheduled", auto: true, createdAt: Date.now(),
+  };
+  posts.push(post);
+  persist();
+  return { ok: true, post };
+}
 
 export const schedulerRouter = Router();
 

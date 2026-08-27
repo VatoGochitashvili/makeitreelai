@@ -39,6 +39,85 @@
     <a class="btn ghost" href="/my-reels.html">My Reels →</a>
   </header>
 
+
+  <!-- Autopilot: the loop a clip tool doesn't close. Connect a feed once and
+       episodes clip and queue themselves with nobody at the keyboard. -->
+  <section class="auto-card" id="autoCard" style="display:none">
+    <div class="auto-head">
+      <div>
+        <span class="eyebrow">Autopilot</span>
+        <h2 id="autoTitle">Let your episodes clip themselves</h2>
+      </div>
+      <span class="auto-state" id="autoState"></span>
+    </div>
+
+    <!-- not connected yet -->
+    <div id="autoSetup">
+      <p class="auto-blurb">
+        Connect your show's RSS feed. Every new episode gets clipped and queued
+        to post automatically — you don't have to open this page again.
+      </p>
+      <form class="auto-form" id="autoForm">
+        <input type="url" id="autoFeed" placeholder="https://feeds.example.com/your-show" required>
+        <button class="btn" type="submit">Connect feed</button>
+      </form>
+      <div class="auto-err" id="autoErr"></div>
+    </div>
+
+    <!-- connected -->
+    <div id="autoLive" style="display:none">
+      <div class="auto-show">
+        <img id="autoArt" alt="" width="56" height="56">
+        <div>
+          <div class="auto-name" id="autoShow"></div>
+          <div class="auto-sub" id="autoLast"></div>
+        </div>
+      </div>
+
+      <div class="auto-settings">
+        <div class="set-field">
+          <label for="autoClips">Clips per episode</label>
+          <select id="autoClips" class="voice-select"></select>
+        </div>
+        <div class="set-field">
+          <label for="autoLength">Clip length</label>
+          <select id="autoLength" class="voice-select">
+            <option value="auto">Auto — varied</option>
+            <option value="short">Short (15–30s)</option>
+            <option value="medium">Medium (30–45s)</option>
+            <option value="long">Long (45–60s)</option>
+          </select>
+        </div>
+        <div class="set-field">
+          <label for="autoHour">Post at</label>
+          <select id="autoHour" class="voice-select"></select>
+        </div>
+      </div>
+
+      <label class="switch" id="autoPostSwitch">
+        <input type="checkbox" id="autoPost">
+        <span class="track"></span>
+        <span class="switch-label">📅 Queue the clips to post, one a day</span>
+      </label>
+
+      <div class="auto-plats" id="autoPlats">
+        <label><input type="checkbox" value="tiktok"> TikTok</label>
+        <label><input type="checkbox" value="instagram"> Instagram</label>
+        <label><input type="checkbox" value="youtube"> YouTube</label>
+      </div>
+
+      <div class="auto-actions">
+        <button class="btn sm" id="autoSave">Save</button>
+        <button class="btn ghost sm" id="autoCheck">Check now</button>
+        <button class="btn ghost sm" id="autoPause"></button>
+        <button class="btn ghost sm danger" id="autoDrop">Disconnect</button>
+      </div>
+      <div class="auto-err" id="autoErr2"></div>
+
+      <div class="auto-log" id="autoLog"></div>
+    </div>
+  </section>
+
   <section id="try">
   <div class="wrap">
     <div class="section-head" style="display:none">
@@ -380,7 +459,7 @@ async function initTool() {
   }
 
   renderCapPreview(); updateSetSum();
-  if (signedIn) loadBackgroundList();
+  if (signedIn) { loadBackgroundList(); initAutopilot(); }
   if (urlInput.value.trim()) loadPreview(normalizeLink(urlInput.value));
 
   // A job keeps running on the server even if this tab was closed — pick it
@@ -404,6 +483,148 @@ async function initTool() {
     } catch (_) { /* nothing running */ }
   }
 }
+
+
+// ---------- autopilot ----------
+// The whole point is that this runs without anyone here, so the UI is mostly
+// a window onto what the server already did.
+let autoFeed = null;
+
+function hourLabel(h) {
+  const ampm = h < 12 ? "am" : "pm";
+  const twelve = h % 12 === 0 ? 12 : h % 12;
+  return `${twelve}:00 ${ampm}`;
+}
+
+async function initAutopilot() {
+  let data;
+  try { data = await (await fetch("/api/autopilot")).json(); } catch (_) { return; }
+  if (!data.enabled) return;                 // Free plan — panel stays hidden
+  $("autoCard").style.display = "block";
+
+  // Fill the pickers once.
+  const clipsSel = $("autoClips");
+  if (!clipsSel.options.length) {
+    const cap = (ME.plan && ME.plan.clipsPerVideo) || 3;
+    for (let n = 1; n <= cap; n++) clipsSel.add(new Option(`${n} clip${n > 1 ? "s" : ""}`, n));
+    for (let h = 0; h < 24; h++) $("autoHour").add(new Option(hourLabel(h), h));
+  }
+
+  autoFeed = data.feed;
+  paintAutopilot();
+}
+
+function paintAutopilot() {
+  const connected = !!autoFeed;
+  $("autoSetup").style.display = connected ? "none" : "block";
+  $("autoLive").style.display = connected ? "block" : "none";
+  $("autoTitle").textContent = connected ? "Autopilot" : "Let your episodes clip themselves";
+  if (!connected) { $("autoState").textContent = ""; return; }
+
+  const f = autoFeed;
+  $("autoState").textContent = f.active ? "● Watching" : "❚❚ Paused";
+  $("autoState").className = "auto-state " + (f.active ? "on" : "off");
+  $("autoShow").textContent = f.show || "Your podcast";
+  $("autoArt").src = f.artwork || "";
+  $("autoArt").style.display = f.artwork ? "block" : "none";
+  $("autoLast").textContent = f.lastError
+    ? `⚠ ${f.lastError}`
+    : f.lastCheck ? `Last checked ${timeAgo(f.lastCheck)}` : "Checking shortly…";
+
+  $("autoClips").value = f.settings.clips;
+  $("autoLength").value = f.settings.length;
+  $("autoHour").value = f.settings.postHour;
+  $("autoPost").checked = f.settings.autoPost;
+  $("autoPlats").querySelectorAll("input").forEach((i) => {
+    i.checked = f.settings.platforms.includes(i.value);
+  });
+  $("autoPause").textContent = f.active ? "Pause" : "Resume";
+
+  $("autoLog").innerHTML = (f.history || []).map((h) => `
+    <div class="auto-ev ${h.kind || ""}">
+      <span class="auto-ev-t">${timeAgo(h.at)}</span>
+      <span>${escapeHtml(h.msg)}</span>
+    </div>`).join("") || `<div class="auto-ev">Nothing has happened yet — that's the idea.</div>`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+function timeAgo(t) {
+  const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.round(s / 60)}m ago`;
+  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
+  return `${Math.round(s / 86400)}d ago`;
+}
+
+function autoSettings() {
+  return {
+    clips: parseInt($("autoClips").value, 10),
+    length: $("autoLength").value,
+    postHour: parseInt($("autoHour").value, 10),
+    autoPost: $("autoPost").checked,
+    platforms: [...$("autoPlats").querySelectorAll("input:checked")].map((i) => i.value),
+  };
+}
+
+async function saveAutopilot(body, errEl) {
+  const el = $(errEl);
+  el.textContent = "";
+  try {
+    const res = await fetch("/api/autopilot", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) { el.textContent = data.error || "That didn't work."; return false; }
+    autoFeed = data.feed;
+    paintAutopilot();
+    return true;
+  } catch (_) {
+    el.textContent = "Couldn't reach the server.";
+    return false;
+  }
+}
+
+$("autoForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = e.target.querySelector("button");
+  btn.disabled = true; btn.textContent = "Reading feed…";
+  await saveAutopilot({ feedUrl: $("autoFeed").value.trim(), settings: autoSettings() }, "autoErr");
+  btn.disabled = false; btn.textContent = "Connect feed";
+});
+
+$("autoSave").addEventListener("click", async () => {
+  const btn = $("autoSave");
+  btn.disabled = true;
+  const ok = await saveAutopilot({ settings: autoSettings() }, "autoErr2");
+  btn.textContent = ok ? "Saved ✓" : "Save";
+  setTimeout(() => { btn.textContent = "Save"; btn.disabled = false; }, 1600);
+});
+
+$("autoPause").addEventListener("click", () =>
+  saveAutopilot({ active: !autoFeed.active }, "autoErr2"));
+
+$("autoCheck").addEventListener("click", async () => {
+  const btn = $("autoCheck");
+  btn.disabled = true; btn.textContent = "Checking…";
+  try {
+    const res = await fetch("/api/autopilot/check", { method: "POST" });
+    const data = await res.json();
+    if (res.ok) { autoFeed = data.feed; paintAutopilot(); }
+    else $("autoErr2").textContent = data.error || "Couldn't read the feed.";
+  } catch (_) { $("autoErr2").textContent = "Couldn't reach the server."; }
+  btn.disabled = false; btn.textContent = "Check now";
+});
+
+$("autoDrop").addEventListener("click", async () => {
+  if (!confirm(`Stop watching "${autoFeed.show}"? Clips you've already made are kept.`)) return;
+  await fetch("/api/autopilot", { method: "DELETE" });
+  autoFeed = null;
+  paintAutopilot();
+});
 
 // ---------- generation settings ----------
 // ---------- gameplay backgrounds (split screen / brainrot) ----------

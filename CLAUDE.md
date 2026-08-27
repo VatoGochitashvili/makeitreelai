@@ -42,11 +42,28 @@ Captioning narration works by sending the TTS audio back through Whisper: we
 know the words but not their timing, and a clean synthetic voice transcribes
 almost exactly.
 
+## Autopilot (the differentiator)
+Opus hands you clips and stops. `src/autopilot.js` closes the loop: a creator
+connects their podcast RSS once, and every new episode is clipped and queued to
+post with nobody at the keyboard.
+
+- polls each active feed every 30 min; newest unseen episode only, one per pass
+- the first sync marks the back catalogue as seen, so connecting a feed doesn't
+  spend a month's quota
+- finished clips are spaced one per day at the user's chosen hour
+- `startJob()` in `server.js` is the shared entry point — the route validates
+  and replies, autopilot calls it directly with no req/res
+
+Still simulated: actual publishing. `src/scheduler.js` flips due posts to
+"posted" without calling TikTok/Instagram/YouTube. Those APIs need registered
+apps, OAuth, and (for TikTok) an audit — start the applications early.
+
 ## Roadmap / good next tasks
 1. **Animated word-by-word captions** — build an `.ass` subtitle file from Whisper word timestamps, burn with ffmpeg. Biggest quality win.
 2. **Face-tracking reframe** — replace the center crop in `cutClip` with active-speaker detection so the crop follows the speaker.
 3. **Accounts + Stripe** — login + $19/mo subscription, per-plan clip limits.
-4. **Auto-post scheduler** — post finished clips to TikTok/IG/YouTube (the edge over Opus).
+4. **Real platform posting** — replace the simulated publisher in `src/scheduler.js`
+   with TikTok/IG/YouTube API calls. This is what makes autopilot actually autopilot.
 5. **Persist jobs** — move the in-memory `jobs` Map to a database.
 
 ## Conventions
