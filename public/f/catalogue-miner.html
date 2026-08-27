@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Reel API — MakeItReel</title>
-  <meta name="description" content="The whole pipeline behind one endpoint.">
+  <title>Catalogue Miner — MakeItReel</title>
+  <meta name="description" content="Reads your whole back catalogue and finds the best moments across every episode.">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -61,40 +61,64 @@
   <a class="pf-back" href="/features.html">← All features</a>
 
   <header class="pf-head">
-    <span class="pf-ic">⌘</span>
-    <h1>Reel API<span class="fb soon">Soon</span></h1>
-    <p class="pf-tag">The whole pipeline behind one endpoint.</p>
+    <span class="pf-ic">⧗</span>
+    <h1>Catalogue Miner<span class="fb live">Live</span></h1>
+    <p class="pf-tag">Reads your whole back catalogue and finds the best moments across every episode.</p>
   </header>
 
   <article class="pf-body">
-      <p>POST a link, poll a job, get clips back. The internals already work this way; it needs auth, quotas and docs.</p>
+      <p>Every other clip tool starts from the file you upload today. A podcaster
+      with eighty episodes therefore has sixty hours of their best thinking in an
+      archive nothing can reach — and a new customer gets nothing at all until
+      they record again.</p>
+      <p>This reads the whole history instead. Each past episode is transcribed
+      once, cheaply, from audio alone. The model then names the subjects the show
+      keeps returning to, and finds the strongest moments on one of them across
+      every episode — six answers from six episodes, not six from whichever file
+      you happened to upload.</p>
   </article>
 
     <section class="pf-block">
-      <h2>Not built yet</h2>
-      <div class="pf-soon">
-        <p><b>There is nothing real to show you here.</b> This is a sketch of the idea,
-        not a recording of it working — the six features marked Live have real output
-        on their pages, and this one will when it earns the badge.</p>
+      <h2>What it actually produces</h2>
+      <div class="pf-mock"><div class="ui "><div class="ui-bar"><i></i><i></i><i></i><span>Back catalogue</span><b>Real run</b></div><div class="ui-body">
+  <div class="mf-head"><span>3 episodes · 123 min indexed</span><b>“young people”</b></div>
+  <div class="cm-themes"><span>Social Media Impact</span><span class="on">Youth Mental Health</span><span>US–Canada Relations</span></div>
+  <div class="mf-list">
+    <div class="mf-row"><span class="mf-t">47s</span>
+      <div><b>Limit Features Undermining Young Minds</b><i>A Historic Settlement Over Social Media…</i></div></div>
+    <div class="mf-row"><span class="mf-t">40s</span>
+      <div><b>Changing Young People's Experience</b><i>A Historic Settlement Over Social Media…</i></div></div>
+    <div class="mf-row"><span class="mf-t">25s</span>
+      <div><b>Solidarity Among Disparate Groups</b><i>The Stunning Rise of the Democratic…</i></div></div>
+  </div>
+  <div class="cm-foot">6 moments · from 3 different episodes</div></div></div></div>
+      <div class="ev-data" style="margin-top:20px">
+        <div class="ev-row"><span>Indexed</span><b>3 episodes · 123 minutes</b></div>
+        <div class="ev-row"><span>Themes it named</span><b>Social Media Impact · Political Movements · US–Canada Relations</b></div>
+        <div class="ev-row"><span>Search “young people”</span><b>4 moments across 2 different episodes</b></div>
+        <div class="ev-row"><span>Lengths returned</span><b>24–47 seconds, complete thoughts</b></div>
       </div>
-      <div class="pf-mock"><div class="ui "><div class="ui-bar"><i></i><i></i><i></i><span>Reel API</span></div><div class="ui-body">
-  <pre class="api req">POST /v1/clip
-Authorization: Bearer sk_live_…
-
-{ "url": "https://youtu.be/…", "clips": 5 }</pre>
-  <pre class="api res">200 OK
-{ "job": "a3f1", "clips": [
-    { "url": "…/clip_1.mp4", "score": 92 },
-    { "url": "…/clip_2.mp4", "score": 88 } ] }</pre></div></div></div>
+      <p class="ev-note">A real scan of a live podcast feed. Any result becomes a clip with one press.</p>
+      <p class="ev-warn"><b>Transcribing a catalogue costs money.</b> Forty episodes quoted $8.21 in
+      testing, so the price is shown and confirmed before a scan starts — never after.</p>
     </section>
 
+    <section class="pf-block">
+      <h2>How it works</h2>
+      <ol class="pf-steps">
+        <li>Connect your show's RSS feed</li>
+        <li>Every past episode is transcribed once, audio only</li>
+        <li>The model names the themes the show keeps returning to</li>
+        <li>Pick one, and the best moments are found across every episode</li>
+      </ol>
+    </section>
 
+  <div class="pf-cta"><a class="btn lg" href="/">Try it now →</a></div>
 
-  <div class="pf-cta">
-    <a class="btn lg" href="/">Try what is built →</a>
-  </div>
-
-  <nav class="pf-nav"><a class="pf-next" href="/f/timeline-export.html">← Timeline Export</a><a class="pf-next" href="/f/agent-bridge.html">Agent Bridge →</a></nav>
+  <nav class="pf-nav">
+    <a class="pf-next" href="/f/moment-finder.html">← Moment Finder</a>
+    <a class="pf-next" href="/f/gameplay-shorts.html">Gameplay Shorts →</a>
+  </nav>
 </main>
 
 <script src="/bg.js"></script>
