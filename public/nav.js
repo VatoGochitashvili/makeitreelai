@@ -43,3 +43,33 @@
     if (target) target.scrollIntoView({ block: "start", behavior: "instant" });
   }, 400));
 })();
+
+
+// Features mega-menu. Opens on hover for a mouse, on click for touch and
+// keyboards — and the trigger stays a real link, so it still works if this
+// script never runs.
+(function () {
+  const wrap = document.getElementById("featTrigger");
+  if (!wrap) return;
+  const trigger = wrap.querySelector(".feat-trigger");
+  let closeTimer;
+
+  const open = () => { clearTimeout(closeTimer); wrap.classList.add("open"); };
+  const close = () => { closeTimer = setTimeout(() => wrap.classList.remove("open"), 140); };
+
+  const finePointer = matchMedia("(hover: hover) and (pointer: fine)").matches;
+  if (finePointer) {
+    wrap.addEventListener("mouseenter", open);
+    wrap.addEventListener("mouseleave", close);
+    wrap.addEventListener("focusin", open);
+    wrap.addEventListener("focusout", close);
+  }
+
+  trigger.addEventListener("click", (e) => {
+    // On touch the first tap opens the menu instead of navigating away.
+    if (!finePointer && !wrap.classList.contains("open")) { e.preventDefault(); open(); }
+  });
+
+  addEventListener("keydown", (e) => { if (e.key === "Escape") wrap.classList.remove("open"); });
+  document.addEventListener("click", (e) => { if (!wrap.contains(e.target)) wrap.classList.remove("open"); });
+})();

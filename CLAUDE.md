@@ -72,6 +72,18 @@ Still simulated: actual publishing. `src/scheduler.js` flips due posts to
 "posted" without calling TikTok/Instagram/YouTube. Those APIs need registered
 apps, OAuth, and (for TikTok) an audit — start the applications early.
 
+## Feature naming
+The nav's Features menu and the on-page grid share one source: the list is
+generated, and every entry carries a Live or Soon badge. Six are Live (Moment
+Finder, Gameplay Shorts, Kinetic Captions, Smart Frame, Voice Over, Autopilot);
+ten are Soon and not built. Keep the badges honest — move one to Live only when
+it actually ships, and say so in the same commit.
+
+Names are deliberately ours, not Opus Clip's: Moment Finder (not ClipAnything),
+Kinetic Captions, Smart Frame (not AI Reframe), Autopilot (not Social
+scheduler), Cutaways (not AI B-Roll), Crew, Edit Room, Cover Art, Brand Kit,
+Timeline Export, Reel API, Agent Bridge, Showcase, Director.
+
 ## Roadmap / good next tasks
 1. **Animated word-by-word captions** — build an `.ass` subtitle file from Whisper word timestamps, burn with ffmpeg. Biggest quality win.
 2. **Face-tracking reframe** — `findSubjectX` is a motion-energy heuristic that
