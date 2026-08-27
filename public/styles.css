@@ -1156,7 +1156,7 @@ body.studio .tool { max-width: 100%; }
   border-bottom: 1px solid var(--line);
 }
 .fp-row {
-  display: grid; grid-template-columns: 1fr 300px; gap: 32px; align-items: center;
+  display: grid; grid-template-columns: 1fr 280px; gap: 34px; align-items: center;
   padding: 22px; border-radius: 16px; border: 1px solid transparent;
   transition: border-color var(--t), background var(--t);
   scroll-margin-top: 110px;
@@ -1295,3 +1295,6 @@ body.studio .tool { max-width: 100%; }
 .cat-meta { display: flex; gap: 14px; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
 .cat-why { color: var(--muted); font-size: 12.5px; margin-top: 8px; line-height: 1.5; }
 .cat-make { margin-top: 12px; }
+
+/* a line under each demo, so you never have to guess what you are looking at */
+.fp-demo-cap { color: var(--muted); font-size: 12px; margin-top: 9px; line-height: 1.45; }

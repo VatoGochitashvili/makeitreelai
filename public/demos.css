@@ -1,242 +1,238 @@
-/* Animated feature demos.
-   One shared box, CSS-only so nothing depends on JS running, and every
-   animation shows the actual mechanism rather than decorating the card. */
+/* Feature demos.
+   Literal on purpose: real transcript lines, real caption words, real API
+   calls, recognisable UI. Where the pipeline has actual output, the demo is
+   that video — nothing explains a clip like the clip. */
 
 .dm {
-  position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 12px;
-  background: linear-gradient(160deg, #12131f, #0b0c14);
-  border: 1px solid rgba(255, 255, 255, .07);
-  overflow: hidden; display: grid; place-items: center;
+  position: relative; width: 100%; aspect-ratio: 4 / 3; border-radius: 14px;
+  background: linear-gradient(165deg, #141524, #0b0c14);
+  border: 1px solid rgba(255, 255, 255, .08);
+  overflow: hidden; display: grid; place-items: center; padding: 14px;
 }
-.dm i, .dm b, .dm span { display: block; }
+.dm-tag {
+  position: absolute; top: 9px; right: 9px; z-index: 3;
+  font-size: 9px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
+  padding: 3px 7px; border-radius: 5px; color: var(--muted);
+  background: rgba(0, 0, 0, .6); border: 1px solid rgba(255, 255, 255, .12);
+}
+.dm-tag.live { color: #6ee7a8; border-color: rgba(110, 231, 168, .35); }
 
-/* Moment Finder — a scan sweeps the timeline and the keepers light up */
-.dm-scan .dm-track { display: flex; gap: 5px; width: 78%; }
-.dm-scan .dm-seg { flex: 1; height: 26px; border-radius: 4px; background: rgba(255,255,255,.07); }
-.dm-scan .dm-seg.hit { animation: seg-hit 3.4s ease-in-out infinite; }
-.dm-scan .dm-seg.hit.d2 { animation-delay: .55s; }
-.dm-scan .dm-seg.hit.d3 { animation-delay: 1.1s; }
-@keyframes seg-hit {
-  0%, 14% { background: rgba(255,255,255,.07); transform: scaleY(1); }
-  22%, 72% { background: linear-gradient(180deg, #a855f7, #ec4899); transform: scaleY(1.5); }
-  85%, 100% { background: rgba(255,255,255,.07); transform: scaleY(1); }
-}
-.dm-scan .dm-sweep {
-  position: absolute; top: 18%; bottom: 18%; width: 2px; border-radius: 2px;
-  background: linear-gradient(180deg, transparent, #67e8f9, transparent);
-  box-shadow: 0 0 12px #67e8f9; animation: sweep 3.4s linear infinite;
-}
-@keyframes sweep { 0% { left: 11%; } 60%, 100% { left: 89%; } }
-.dm-scan .dm-scores { position: absolute; bottom: 14%; display: flex; gap: 26px; }
-.dm-scan .dm-scores b {
-  font-size: 10px; font-weight: 800; color: #f0abfc; opacity: 0;
-  animation: score-in 3.4s ease-in-out infinite;
-}
-.dm-scan .dm-scores b.d2 { animation-delay: .55s; }
-.dm-scan .dm-scores b.d3 { animation-delay: 1.1s; }
-@keyframes score-in { 0%, 18% { opacity: 0; transform: translateY(4px); } 26%, 74% { opacity: 1; transform: none; } 88%, 100% { opacity: 0; } }
-
-/* Gameplay Shorts — clip on top, gameplay scrolling underneath */
-.dm-split .dm-phone {
-  width: 30%; height: 84%; border-radius: 8px; overflow: hidden; position: relative;
-  border: 1px solid rgba(255,255,255,.12); display: flex; flex-direction: column;
-}
-.dm-split .dm-top { flex: 1; background: linear-gradient(160deg, #24304a, #161d2e); display: grid; place-items: center; }
-.dm-split .dm-head { width: 26%; aspect-ratio: 1; border-radius: 50%; background: #d9a066; }
-.dm-split .dm-bot { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 2px; background: #0d2818; }
-.dm-split .dm-bot i { background: #2f7d4f; border-radius: 2px; animation: gp 1.6s linear infinite; }
-.dm-split .dm-bot i:nth-child(2n) { background: #3d9c63; animation-delay: -.4s; }
-.dm-split .dm-bot i:nth-child(3n) { background: #256b41; animation-delay: -.8s; }
-@keyframes gp { 0% { transform: translateY(0); opacity: 1; } 50% { transform: translateY(-3px); opacity: .75; } 100% { transform: translateY(0); opacity: 1; } }
-.dm-split .dm-cap {
-  position: absolute; left: 0; right: 0; top: 46%; text-align: center;
-  font-size: 7px; font-weight: 900; color: #fff; text-shadow: 0 1px 2px #000;
-  animation: cap-pop 2.2s ease-in-out infinite;
-}
-@keyframes cap-pop { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
-
-/* Kinetic Captions — one word at a time, in time with the speech */
-.dm-caps { gap: 6px; display: flex; flex-wrap: wrap; justify-content: center; padding: 0 12%; }
-.dm-caps .w {
-  font-size: clamp(11px, 2.4vw, 15px); font-weight: 900; letter-spacing: -.01em;
-  color: #fff; opacity: .18; transform: translateY(2px);
-  animation: word 2.8s steps(1, end) infinite;
-}
-.dm-caps .w:nth-child(1) { animation-delay: 0s; }
-.dm-caps .w:nth-child(2) { animation-delay: .4s; }
-.dm-caps .w:nth-child(3) { animation-delay: .8s; }
-.dm-caps .w:nth-child(4) { animation-delay: 1.2s; }
-@keyframes word {
-  0%, 12% { opacity: 1; color: #f0abfc; transform: translateY(-2px); }
-  13%, 100% { opacity: .18; color: #fff; transform: translateY(2px); }
+/* --- the real thing --- */
+/* The video has to be pinned, not sized: height:100% inside a grid area whose
+   height comes from aspect-ratio is circular, so the card grew to the clip's
+   own 9:16 and stood twice as tall as every other card on the page.
+   Captions sit centre-frame in these clips, so cover keeps them. */
+.dm-real { padding: 0; background: #05060a; }
+.dm-real video {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; border-radius: 13px; display: block;
 }
 
-/* Smart Frame — the crop window moves onto the speaker and resizes */
-.dm-frame .dm-wide {
-  position: relative; width: 82%; aspect-ratio: 16/9; border-radius: 6px;
-  background: linear-gradient(160deg, #1c2740, #131a2b); border: 1px solid rgba(255,255,255,.08);
+/* --- Moment Finder: a transcript being read, with the pick --- */
+.dm-tx { align-content: start; justify-items: stretch; gap: 0; padding: 12px; }
+.dm-tx-head {
+  display: flex; justify-content: space-between; font-size: 10px; color: var(--muted);
+  padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,.08); margin-bottom: 8px;
 }
-.dm-frame .dm-subject {
-  position: absolute; top: 26%; left: 30%; width: 13%; aspect-ratio: 1;
-  border-radius: 50%; background: #d9a066;
+.dm-tx-dur { opacity: .7; }
+.dm-tx-body p {
+  font-size: 10.5px; line-height: 1.5; color: #6f748c; padding: 3px 6px;
+  border-radius: 5px; margin: 0; transition: none;
 }
-.dm-frame .dm-crop {
-  position: absolute; top: 50%; height: 62%; aspect-ratio: 9/16;
-  border: 2px solid #a855f7; border-radius: 4px;
-  box-shadow: 0 0 0 999px rgba(4, 5, 10, .55);
-  animation: crop 5.4s ease-in-out infinite;
+.dm-tx-body p.pick { animation: tx-pick 4s ease-in-out infinite; }
+.dm-tx-body p.pick:nth-of-type(3) { animation-delay: .25s; }
+@keyframes tx-pick {
+  0%, 22% { background: transparent; color: #6f748c; }
+  36%, 88% { background: rgba(168,85,247,.16); color: #efe9ff; }
+  100% { background: transparent; color: #6f748c; }
 }
-@keyframes crop {
-  0%, 22%   { left: 50%; transform: translate(-50%, -50%) scaleX(1); }
-  33%, 55%  { left: 38%; transform: translate(-50%, -50%) scaleX(1); }
-  66%, 88%  { left: 38%; transform: translate(-50%, -50%) scaleX(1.6); }
-  100%      { left: 50%; transform: translate(-50%, -50%) scaleX(1); }
+.dm-tx-out {
+  margin-top: 10px; display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 8px; background: rgba(168,85,247,.1);
+  border: 1px solid rgba(168,85,247,.3); opacity: 0;
+  animation: tx-out 4s ease-in-out infinite;
 }
-.dm-frame .dm-labels { position: absolute; bottom: 7%; display: flex; gap: 12px; font-size: 8.5px; color: var(--muted); }
-.dm-frame .dm-labels span { animation: lbl 5.4s steps(1, end) infinite; }
-.dm-frame .dm-labels span:nth-child(2) { animation-delay: -3.6s; }
-.dm-frame .dm-labels span:nth-child(3) { animation-delay: -1.8s; }
-@keyframes lbl { 0%, 33% { color: #f0abfc; } 34%, 100% { color: #6a6d80; } }
+.dm-tx-out b { font-size: 10px; color: #f0abfc; white-space: nowrap; }
+.dm-tx-out span { font-size: 10px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dm-tx-out i { margin-left: auto; font-size: 10px; font-weight: 800; color: #6ee7a8; font-style: normal; }
+@keyframes tx-out { 0%, 44% { opacity: 0; transform: translateY(5px); } 58%, 90% { opacity: 1; transform: none; } 100% { opacity: 0; } }
 
-/* Voice Over — a waveform that actually speaks in bursts */
-.dm-wave { display: flex; gap: 4px; align-items: center; height: 100%; }
-.dm-wave i { width: 4px; border-radius: 2px; background: linear-gradient(180deg, #a855f7, #ec4899); animation: wv 1.1s ease-in-out infinite; }
-.dm-wave i:nth-child(1) { animation-delay: -.9s } .dm-wave i:nth-child(2) { animation-delay: -.8s }
-.dm-wave i:nth-child(3) { animation-delay: -.7s } .dm-wave i:nth-child(4) { animation-delay: -.6s }
-.dm-wave i:nth-child(5) { animation-delay: -.5s } .dm-wave i:nth-child(6) { animation-delay: -.4s }
-.dm-wave i:nth-child(7) { animation-delay: -.3s } .dm-wave i:nth-child(8) { animation-delay: -.2s }
-.dm-wave i:nth-child(9) { animation-delay: -.1s } .dm-wave i:nth-child(10){ animation-delay: 0s }
-.dm-wave i:nth-child(11){ animation-delay: -.35s } .dm-wave i:nth-child(12){ animation-delay: -.65s }
-@keyframes wv { 0%, 100% { height: 12%; } 50% { height: 68%; } }
-
-/* Autopilot — an episode arrives and fills the week by itself */
-.dm-auto .dm-feed {
-  position: absolute; left: 10%; top: 50%; transform: translateY(-50%);
-  font-size: 8px; font-weight: 800; letter-spacing: .06em; color: #67e8f9;
-  border: 1px solid rgba(103,232,249,.4); border-radius: 5px; padding: 4px 6px;
+/* --- Autopilot: an episode arrives, the week fills --- */
+.dm-ap { gap: 10px; align-content: center; }
+.dm-ap-feed {
+  display: flex; align-items: center; gap: 7px; font-size: 10.5px; color: #67e8f9;
+  border: 1px solid rgba(103,232,249,.35); border-radius: 7px; padding: 6px 10px;
 }
-.dm-auto .dm-flow {
-  position: absolute; left: 26%; top: 50%; width: 6px; height: 6px; border-radius: 50%;
-  background: #67e8f9; box-shadow: 0 0 10px #67e8f9; animation: flow 2.6s ease-in-out infinite;
+.dm-ap-feed i { width: 7px; height: 7px; border-radius: 50%; background: #67e8f9; animation: ap-blink 2.8s ease-in-out infinite; }
+@keyframes ap-blink { 0%, 100% { opacity: .35; } 20% { opacity: 1; box-shadow: 0 0 10px #67e8f9; } }
+.dm-ap-arrow { width: 1px; height: 16px; background: linear-gradient(180deg, rgba(103,232,249,.6), transparent); }
+.dm-ap-week { display: flex; gap: 6px; }
+.dm-ap-day { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.dm-ap-day b { font-size: 8.5px; color: var(--muted); font-weight: 600; }
+.dm-ap-day .slot {
+  width: 26px; height: 38px; border-radius: 5px;
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.07);
+  animation: ap-fill 2.8s ease-in-out infinite;
 }
-@keyframes flow { 0% { left: 26%; opacity: 0; } 15% { opacity: 1; } 75% { left: 62%; opacity: 1; } 100% { left: 62%; opacity: 0; } }
-.dm-auto .dm-days { position: absolute; right: 9%; display: flex; gap: 5px; }
-.dm-auto .dm-days b {
-  width: 15px; height: 22px; border-radius: 4px; background: rgba(255,255,255,.06);
-  font-size: 7px; color: var(--muted); display: grid; place-items: center;
-  animation: dayfill 2.6s ease-in-out infinite;
-}
-.dm-auto .dm-days b:nth-child(2) { animation-delay: .16s }
-.dm-auto .dm-days b:nth-child(3) { animation-delay: .32s }
-.dm-auto .dm-days b:nth-child(4) { animation-delay: .48s }
-.dm-auto .dm-days b:nth-child(5) { animation-delay: .64s }
-@keyframes dayfill {
-  0%, 55% { background: rgba(255,255,255,.06); color: #6a6d80; }
-  70%, 92% { background: linear-gradient(160deg, #a855f7, #ec4899); color: #fff; }
-  100% { background: rgba(255,255,255,.06); color: #6a6d80; }
+.dm-ap-day:nth-child(2) .slot { animation-delay: .16s }
+.dm-ap-day:nth-child(3) .slot { animation-delay: .32s }
+.dm-ap-day:nth-child(4) .slot { animation-delay: .48s }
+.dm-ap-day:nth-child(5) .slot { animation-delay: .64s }
+@keyframes ap-fill {
+  0%, 40% { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.07); }
+  58%, 92% { background: linear-gradient(160deg,#a855f7,#ec4899); border-color: transparent; }
+  100% { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.07); }
 }
 
-/* Director — a messy pile resolves into one cut */
-.dm-director { gap: 10px; display: flex; }
-.dm-director .dm-raw { display: flex; gap: 3px; }
-.dm-director .dm-raw i {
-  width: 8px; height: 30px; border-radius: 2px; background: rgba(255,255,255,.13);
-  animation: tidy 3.2s ease-in-out infinite;
+/* --- Director: one long file in, posts out --- */
+.dm-dir { gap: 12px; align-content: center; }
+.dm-dir-in { display: flex; align-items: center; gap: 8px; font-size: 10.5px; color: var(--muted); }
+.dm-dir-in i { width: 16px; height: 20px; border-radius: 3px; background: rgba(255,255,255,.14); }
+.dm-dir-bar { width: 130px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.08); overflow: hidden; }
+.dm-dir-bar b { display: block; height: 100%; width: 0; background: var(--grad); animation: dir-run 3.4s ease-in-out infinite; }
+@keyframes dir-run { 0% { width: 0 } 55%, 100% { width: 100% } }
+.dm-dir-out { display: flex; gap: 8px; }
+.dm-dir-out .ph {
+  width: 32px; height: 52px; border-radius: 5px; background: #1b2236;
+  border: 1px solid rgba(255,255,255,.1); display: grid; place-items: end center; padding-bottom: 5px;
+  opacity: 0; animation: dir-pop 3.4s ease-in-out infinite;
 }
-.dm-director .dm-raw i:nth-child(2){ animation-delay: .1s } .dm-director .dm-raw i:nth-child(3){ animation-delay: .2s }
-.dm-director .dm-raw i:nth-child(4){ animation-delay: .3s } .dm-director .dm-raw i:nth-child(5){ animation-delay: .4s }
-@keyframes tidy { 0%, 100% { transform: rotate(-8deg) translateY(3px); } 50% { transform: none; } }
-.dm-director .dm-arrow { width: 16px; height: 1px; background: rgba(255,255,255,.3); position: relative; }
-.dm-director .dm-arrow::after { content: ""; position: absolute; right: 0; top: -2px; border-left: 4px solid rgba(255,255,255,.4); border-top: 2.5px solid transparent; border-bottom: 2.5px solid transparent; }
-.dm-director .dm-cut { width: 42px; height: 30px; border-radius: 4px; background: linear-gradient(160deg, #a855f7, #ec4899); animation: pulse 3.2s ease-in-out infinite; }
-@keyframes pulse { 0%, 40% { opacity: .35; } 60%, 100% { opacity: 1; } }
+.dm-dir-out .ph i { width: 20px; height: 4px; border-radius: 2px; background: #fff; opacity: .75; }
+.dm-dir-out .ph:nth-child(2) { animation-delay: .12s } .dm-dir-out .ph:nth-child(3) { animation-delay: .24s }
+@keyframes dir-pop { 0%, 55% { opacity: 0; transform: translateY(8px); } 72%, 94% { opacity: 1; transform: none; } 100% { opacity: 0; } }
 
-/* Cover Art — a thumbnail assembling itself */
-.dm-cover .dm-thumb {
-  width: 58%; aspect-ratio: 16/9; border-radius: 6px; position: relative;
+/* --- Cover Art: a thumbnail assembling --- */
+.dm-cv-thumb {
+  width: 190px; aspect-ratio: 16/9; border-radius: 8px; position: relative; overflow: hidden;
+  background: linear-gradient(150deg, #2b3a5c, #161d2e); border: 1px solid rgba(255,255,255,.1);
+  display: grid; align-content: end; padding: 10px;
+}
+.dm-cv-face { position: absolute; right: 14px; top: 16px; width: 44px; height: 44px; border-radius: 50%; background: #d9a878; animation: cv-face 3.2s ease-in-out infinite; }
+.dm-cv-thumb b {
+  font-size: 14px; font-weight: 900; line-height: 1.1; color: #fff; max-width: 62%;
+  text-shadow: 0 2px 6px rgba(0,0,0,.7); animation: cv-txt 3.2s ease-in-out infinite;
+}
+@keyframes cv-face { 0%, 18% { opacity: 0; transform: scale(.6); } 34%, 90% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+@keyframes cv-txt { 0%, 30% { opacity: 0; transform: translateX(-12px); } 46%, 90% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+
+/* --- Brand Kit: your palette lands on the clip --- */
+.dm-bk { display: flex; gap: 14px; align-items: center; }
+.dm-bk-phone {
+  width: 74px; height: 122px; border-radius: 9px; position: relative;
+  background: linear-gradient(160deg, #24304a, #161d2e); border: 2px solid rgba(255,255,255,.12);
+  display: grid; align-content: center; justify-items: center;
+  animation: bk-brand 3.6s ease-in-out infinite;
+}
+@keyframes bk-brand { 0%, 34% { border-color: rgba(255,255,255,.12) } 52%, 100% { border-color: #ec4899 } }
+.dm-bk-cap {
+  font-size: 8.5px; font-weight: 900; color: #fff; padding: 2px 5px; border-radius: 3px;
+  animation: bk-cap 3.6s ease-in-out infinite;
+}
+@keyframes bk-cap { 0%, 34% { background: transparent } 52%, 100% { background: #ec4899 } }
+.dm-bk-logo {
+  position: absolute; top: 7px; right: 7px; width: 12px; height: 12px; border-radius: 3px;
+  background: var(--grad); opacity: 0; animation: bk-logo 3.6s ease-in-out infinite;
+}
+@keyframes bk-logo { 0%, 44% { opacity: 0 } 60%, 100% { opacity: 1 } }
+.dm-bk-side { display: flex; flex-direction: column; gap: 7px; }
+.dm-bk-side .sw { width: 22px; height: 22px; border-radius: 5px; }
+.dm-bk-side .sw.a { background: #a855f7 } .dm-bk-side .sw.b { background: #ec4899 } .dm-bk-side .sw.c { background: #67e8f9 }
+.dm-bk-side .fnt { font-size: 13px; font-weight: 800; color: var(--muted); text-align: center; }
+
+/* --- Cutaways: B-roll covers the talking --- */
+.dm-cw-phone {
+  width: 96px; height: 160px; border-radius: 10px; position: relative; overflow: hidden;
   background: linear-gradient(160deg, #24304a, #161d2e); border: 1px solid rgba(255,255,255,.1);
 }
-.dm-cover .dm-face { position: absolute; right: 12%; top: 22%; width: 22%; aspect-ratio: 1; border-radius: 50%; background: #d9a066; animation: pop 3s ease-in-out infinite; }
-.dm-cover .dm-title { position: absolute; left: 9%; top: 34%; width: 42%; height: 7px; border-radius: 2px; background: #fff; animation: slidein 3s ease-in-out infinite; }
-.dm-cover .dm-title.s { top: 50%; width: 28%; opacity: .5; animation-delay: .18s; }
-@keyframes slidein { 0%, 12% { transform: translateX(-14px); opacity: 0; } 30%, 88% { transform: none; opacity: 1; } 100% { opacity: 0; } }
-@keyframes pop { 0%, 20% { transform: scale(.5); opacity: 0; } 38%, 88% { transform: scale(1); opacity: 1; } 100% { opacity: 0; } }
-
-/* Brand Kit — one palette lands on every clip */
-.dm-brand .dm-screen { width: 46%; aspect-ratio: 16/9; border-radius: 6px; background: #161d2e; border: 2px solid rgba(255,255,255,.12); animation: brandify 3.6s ease-in-out infinite; }
-@keyframes brandify { 0%, 30% { border-color: rgba(255,255,255,.12); } 50%, 100% { border-color: #ec4899; box-shadow: 0 0 18px rgba(236,72,153,.35); } }
-.dm-brand .dm-swatches { position: absolute; bottom: 14%; display: flex; gap: 6px; }
-.dm-brand .dm-swatches i { width: 12px; height: 12px; border-radius: 3px; animation: swatch 3.6s ease-in-out infinite; }
-.dm-brand .dm-swatches i:nth-child(1) { background: #a855f7 }
-.dm-brand .dm-swatches i:nth-child(2) { background: #ec4899; animation-delay: .12s }
-.dm-brand .dm-swatches i:nth-child(3) { background: #67e8f9; animation-delay: .24s }
-@keyframes swatch { 0%, 25% { transform: translateY(6px); opacity: 0; } 45%, 100% { transform: none; opacity: 1; } }
-
-/* Cutaways — B-roll drops in over the talking */
-.dm-broll .dm-main { width: 58%; aspect-ratio: 16/9; border-radius: 6px; background: linear-gradient(160deg, #24304a, #161d2e); }
-.dm-broll .dm-inset {
-  position: absolute; width: 30%; aspect-ratio: 16/9; border-radius: 5px;
-  background: linear-gradient(160deg, #a855f7, #ec4899);
-  animation: broll 3.4s ease-in-out infinite;
+.dm-cw-head { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); width: 34px; height: 34px; border-radius: 50%; background: #d9a878; }
+.dm-cw-roll {
+  position: absolute; inset: 6px 6px auto 6px; height: 62px; border-radius: 7px;
+  display: grid; place-items: center; font-size: 9px; font-weight: 800; color: #fff;
+  background: linear-gradient(150deg, #a855f7, #ec4899);
+  animation: cw-roll 3.6s ease-in-out infinite;
 }
-@keyframes broll {
-  0%, 22% { transform: translate(40px, 14px) scale(.7); opacity: 0; }
-  38%, 74% { transform: translate(26px, 10px) scale(1); opacity: 1; }
-  90%, 100% { transform: translate(40px, 14px) scale(.7); opacity: 0; }
+@keyframes cw-roll { 0%, 24% { opacity: 0; transform: translateY(-14px) } 40%, 78% { opacity: 1; transform: none } 92%, 100% { opacity: 0; transform: translateY(-14px) } }
+.dm-cw-cap { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font-size: 8px; font-weight: 800; color: #fff; text-shadow: 0 1px 3px #000; }
+
+/* --- Edit Room: a timeline you can nudge --- */
+.dm-er { align-content: center; gap: 8px; justify-items: center; }
+.dm-er-lane { width: 190px; height: 22px; border-radius: 5px; background: rgba(255,255,255,.05); position: relative; display: flex; gap: 2px; padding: 2px; }
+.dm-er-lane span { border-radius: 3px; }
+.dm-er-lane .c1 { flex: 2; background: linear-gradient(90deg,#a855f7,#c084fc); animation: er-trim 3.2s ease-in-out infinite; }
+.dm-er-lane .c2 { flex: 1.2; background: #ec4899; }
+.dm-er-lane .c3 { flex: 1; background: #6366f1; }
+@keyframes er-trim { 0%, 100% { flex-grow: 2 } 50% { flex-grow: 3.2 } }
+.dm-er-lane .ph { position: absolute; top: -3px; bottom: -3px; width: 3px; border-radius: 2px; background: #67e8f9; box-shadow: 0 0 8px #67e8f9; animation: er-hand 3.2s ease-in-out infinite; }
+@keyframes er-hand { 0%, 100% { left: 48% } 50% { left: 66% } }
+.dm-er-lane.cap { background: none; padding: 0; gap: 4px; height: auto; }
+.dm-er-lane.cap .w { font-size: 8.5px; font-weight: 800; color: #fff; background: rgba(255,255,255,.1); padding: 3px 6px; border-radius: 4px; }
+.dm-er-foot { font-size: 9px; color: var(--muted); }
+
+/* --- Crew: separate people, one library --- */
+.dm-cr { align-content: center; gap: 10px; justify-items: center; }
+.dm-cr-people { display: flex; }
+.dm-cr-people .av {
+  width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 11px; font-weight: 800; color: #fff; border: 2px solid #0d0e18; margin-left: -8px;
 }
+.dm-cr-people .av.a { background: #a855f7; margin-left: 0 } .dm-cr-people .av.b { background: #ec4899 } .dm-cr-people .av.c { background: #67e8f9; color: #06263a }
+.dm-cr-lib { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+.dm-cr-lib i { width: 30px; height: 44px; border-radius: 4px; background: #1b2236; border: 1px solid rgba(255,255,255,.08); animation: cr-tile 3.4s ease-in-out infinite; }
+.dm-cr-lib i:nth-child(2){animation-delay:.1s} .dm-cr-lib i:nth-child(3){animation-delay:.2s}
+.dm-cr-lib i:nth-child(4){animation-delay:.3s} .dm-cr-lib i:nth-child(5){animation-delay:.4s} .dm-cr-lib i:nth-child(6){animation-delay:.5s}
+@keyframes cr-tile { 0%, 100% { border-color: rgba(255,255,255,.08) } 50% { border-color: rgba(168,85,247,.6) } }
+.dm-cr-foot { font-size: 9px; color: var(--muted); }
 
-/* Edit Room — nudge a cut on the timeline */
-.dm-edit { flex-direction: column; gap: 6px; display: flex; }
-.dm-edit .dm-lane { width: 70%; height: 16px; border-radius: 4px; background: rgba(255,255,255,.05); position: relative; }
-.dm-edit .dm-clip { position: absolute; left: 8%; top: 2px; bottom: 2px; width: 46%; border-radius: 3px; background: linear-gradient(90deg, #a855f7, #c084fc); animation: trim 3.2s ease-in-out infinite; }
-.dm-edit .dm-clip.b { left: 22%; width: 40%; background: linear-gradient(90deg, #ec4899, #f0abfc); animation: none; }
-.dm-edit .dm-handle { position: absolute; top: -2px; bottom: -2px; width: 3px; border-radius: 2px; background: #67e8f9; box-shadow: 0 0 8px #67e8f9; animation: handle 3.2s ease-in-out infinite; }
-@keyframes trim { 0%, 100% { width: 46%; } 50% { width: 62%; } }
-@keyframes handle { 0%, 100% { left: 54%; } 50% { left: 70%; } }
-
-/* Crew — separate people, one library */
-.dm-crew .dm-av { position: absolute; width: 18px; height: 18px; border-radius: 50%; border: 2px solid #0b0c14; }
-.dm-crew .dm-av { left: 32%; top: 26%; background: #a855f7; animation: gather 3.4s ease-in-out infinite; }
-.dm-crew .dm-av.a2 { left: 48%; top: 20%; background: #ec4899; animation-delay: .12s; }
-.dm-crew .dm-av.a3 { left: 62%; top: 28%; background: #67e8f9; animation-delay: .24s; }
-@keyframes gather { 0%, 100% { transform: translateY(-6px); opacity: .55; } 50% { transform: none; opacity: 1; } }
-.dm-crew .dm-shared { position: absolute; bottom: 22%; width: 44%; height: 22px; border-radius: 5px; background: rgba(255,255,255,.07); border: 1px dashed rgba(255,255,255,.2); }
-
-/* Timeline Export — the cut leaves as an edit list */
-.dm-export { flex-direction: column; gap: 10px; display: flex; }
-.dm-export .dm-lane.x { width: 62%; height: 18px; display: flex; gap: 3px; }
-.dm-export .dm-clip { flex: 1; border-radius: 3px; background: #a855f7; animation: handoff 3s ease-in-out infinite; }
-.dm-export .dm-clip.b { background: #ec4899; animation-delay: .12s; }
-.dm-export .dm-clip:nth-child(3) { animation-delay: .24s; }
-@keyframes handoff { 0%, 45% { transform: none; opacity: 1; } 70%, 100% { transform: translateY(14px); opacity: .25; } }
-.dm-export .dm-xml { font-size: 8px; font-weight: 800; letter-spacing: .1em; color: #67e8f9; border: 1px solid rgba(103,232,249,.4); border-radius: 4px; padding: 3px 7px; animation: xmlin 3s ease-in-out infinite; }
-@keyframes xmlin { 0%, 55% { opacity: 0; transform: translateY(-6px); } 75%, 100% { opacity: 1; transform: none; } }
-
-/* Reel API — one call, clips back */
-.dm-api { flex-direction: column; gap: 10px; display: flex; }
-.dm-api .dm-req { font-size: 9px; font-family: ui-monospace, monospace; color: #67e8f9; background: rgba(103,232,249,.09); border: 1px solid rgba(103,232,249,.28); border-radius: 5px; padding: 4px 8px; }
-.dm-api .dm-out { display: flex; gap: 5px; }
-.dm-api .dm-out i { width: 13px; height: 22px; border-radius: 3px; background: linear-gradient(160deg, #a855f7, #ec4899); animation: apiout 2.6s ease-in-out infinite; }
-.dm-api .dm-out i:nth-child(2) { animation-delay: .14s } .dm-api .dm-out i:nth-child(3) { animation-delay: .28s }
-@keyframes apiout { 0%, 25% { transform: translateY(-8px); opacity: 0; } 45%, 88% { transform: none; opacity: 1; } 100% { opacity: 0; } }
-
-/* Agent Bridge — an agent drives it with no browser */
-.dm-bridge { display: flex; align-items: center; gap: 8px; }
-.dm-bridge .dm-node { font-size: 8px; font-weight: 700; color: var(--muted); border: 1px solid rgba(255,255,255,.16); border-radius: 5px; padding: 5px 8px; }
-.dm-bridge .dm-node.r { color: #f0abfc; border-color: rgba(240,171,252,.4); }
-.dm-bridge .dm-link { width: 44px; height: 2px; border-radius: 2px; background: rgba(255,255,255,.14); position: relative; overflow: hidden; }
-.dm-bridge .dm-link::after { content: ""; position: absolute; top: 0; bottom: 0; width: 12px; background: #67e8f9; box-shadow: 0 0 8px #67e8f9; animation: packet 1.8s linear infinite; }
-@keyframes packet { 0% { left: -14px; } 100% { left: 46px; } }
-
-/* Showcase — a wall of real outputs */
-.dm-gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; width: 58%; }
-.dm-gallery i { aspect-ratio: 9/16; border-radius: 3px; background: linear-gradient(160deg, #2a3350, #171e30); animation: tile 3.6s ease-in-out infinite; }
-.dm-gallery i:nth-child(2){ animation-delay: .2s } .dm-gallery i:nth-child(3){ animation-delay: .4s }
-.dm-gallery i:nth-child(4){ animation-delay: .6s } .dm-gallery i:nth-child(5){ animation-delay: .8s }
-.dm-gallery i:nth-child(6){ animation-delay: 1s }
-@keyframes tile { 0%, 100% { background: linear-gradient(160deg, #2a3350, #171e30); } 50% { background: linear-gradient(160deg, #a855f7, #ec4899); } }
-
-/* Movement is the point here, but not at the cost of anyone who can't take it. */
-@media (prefers-reduced-motion: reduce) {
-  .dm *, .dm { animation: none !important; }
+/* --- Timeline Export: the cut leaves as a file --- */
+.dm-xp { gap: 10px; align-content: center; }
+.dm-xp-lane { display: flex; gap: 3px; width: 150px; height: 20px; }
+.dm-xp-lane span { flex: 1; border-radius: 3px; background: #a855f7; animation: xp-go 3s ease-in-out infinite; }
+.dm-xp-lane span:nth-child(2) { background: #ec4899; animation-delay: .1s }
+.dm-xp-lane span:nth-child(3) { animation-delay: .2s }
+@keyframes xp-go { 0%, 40% { transform: none; opacity: 1 } 66%, 100% { transform: translateY(10px); opacity: .2 } }
+.dm-xp-arrow { width: 1px; height: 14px; background: linear-gradient(180deg, rgba(255,255,255,.3), transparent); }
+.dm-xp-file {
+  display: grid; justify-items: center; gap: 3px; padding: 8px 14px; border-radius: 8px;
+  background: rgba(103,232,249,.08); border: 1px solid rgba(103,232,249,.3);
+  opacity: 0; animation: xp-file 3s ease-in-out infinite;
 }
+.dm-xp-file b { font-size: 11px; color: #67e8f9; font-family: ui-monospace, monospace; }
+.dm-xp-file span { font-size: 8.5px; color: var(--muted); }
+@keyframes xp-file { 0%, 50% { opacity: 0; transform: translateY(-6px) } 70%, 100% { opacity: 1; transform: none } }
+
+/* --- Reel API: an actual call and an actual response --- */
+.dm-api { align-content: center; gap: 9px; justify-items: stretch; }
+.dm-api pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 9.5px; line-height: 1.5;
+  padding: 8px 10px; border-radius: 7px; margin: 0; white-space: pre;
+}
+.dm-api-req { color: #cbd3e6; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); }
+.dm-api-res {
+  color: #6ee7a8; background: rgba(110,231,168,.07); border: 1px solid rgba(110,231,168,.25);
+  opacity: 0; animation: api-res 3s ease-in-out infinite;
+}
+@keyframes api-res { 0%, 38% { opacity: 0; transform: translateY(-5px) } 55%, 92% { opacity: 1; transform: none } 100% { opacity: 0 } }
+
+/* --- Agent Bridge: an agent asks, clips come back --- */
+.dm-ab { align-content: center; gap: 9px; justify-items: center; }
+.dm-ab-msg { font-size: 10.5px; color: var(--text); background: rgba(255,255,255,.07); border-radius: 12px 12px 12px 3px; padding: 7px 11px; }
+.dm-ab-tool {
+  display: flex; align-items: center; gap: 6px; font-size: 9.5px; color: #67e8f9;
+  font-family: ui-monospace, monospace; border: 1px dashed rgba(103,232,249,.4);
+  border-radius: 6px; padding: 5px 9px;
+}
+.dm-ab-tool i { width: 5px; height: 5px; border-radius: 50%; background: #67e8f9; animation: ap-blink 1.6s ease-in-out infinite; }
+.dm-ab-out { display: flex; gap: 5px; }
+.dm-ab-out span { width: 24px; height: 38px; border-radius: 4px; background: linear-gradient(160deg,#a855f7,#ec4899); opacity: 0; animation: dir-pop 3s ease-in-out infinite; }
+.dm-ab-out span:nth-child(2){animation-delay:.12s} .dm-ab-out span:nth-child(3){animation-delay:.24s}
+
+/* --- Showcase: a wall of finished shorts --- */
+/* max-width on the card itself shrank the whole box, so this one sat shorter
+   than every other card in the column. Constrain the grid, not the card. */
+.dm-sc { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.dm-sc i { max-width: 46px; }
+.dm-sc i { aspect-ratio: 9/16; width: 100%; border-radius: 4px; background: linear-gradient(160deg, #2a3350, #171e30); animation: cr-tile 3.6s ease-in-out infinite; }
+.dm-sc i:nth-child(2){animation-delay:.15s} .dm-sc i:nth-child(3){animation-delay:.3s} .dm-sc i:nth-child(4){animation-delay:.45s}
+.dm-sc i:nth-child(5){animation-delay:.6s} .dm-sc i:nth-child(6){animation-delay:.75s} .dm-sc i:nth-child(7){animation-delay:.9s} .dm-sc i:nth-child(8){animation-delay:1.05s}
+
+@media (prefers-reduced-motion: reduce) { .dm *, .dm { animation: none !important; } }
