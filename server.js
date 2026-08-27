@@ -15,6 +15,7 @@ import { fetchPodcastFeed, normalizeUrl, isDirectMedia } from "./src/sources.js"
 import { workerRouter, workerEnabled, requestDownload, workerOnline } from "./src/worker-queue.js";
 import { backgroundsRouter, loadBackgrounds, findBackground, anyBackground } from "./src/backgrounds.js";
 import { autopilotRouter, initAutopilot } from "./src/autopilot.js";
+import { catalogueRouter } from "./src/catalogue.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -36,6 +37,7 @@ app.use("/api", reelsRouter);
 app.use("/api", workerRouter);
 app.use("/api", backgroundsRouter);
 app.use("/api", autopilotRouter);
+app.use("/api", catalogueRouter);
 await loadBackgrounds();
 
 // finished clips are served from here

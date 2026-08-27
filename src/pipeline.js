@@ -1285,6 +1285,26 @@ async function cutBrainrot(clip, index, workDir, resolution, caption, log, backg
   return out;
 }
 
+// Transcribe one source and return its segments — no clipping, no rendering.
+//
+// The back-catalogue miner needs the words from every past episode, not clips
+// of them. Audio-only keeps it cheap: a 45-minute episode is a few MB and about
+// a quarter of a cent, where fetching the video would be hundreds of MB.
+export async function transcribeSource(url, log = () => {}) {
+  const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "makeitreel-tx-"));
+  try {
+    const normalized = normalizeUrl(url).url;
+    const audio = isDirectMedia(normalized)
+      ? await downloadDirect(normalized, workDir, log)
+      : await downloadAudioOnly(url, workDir, log);
+    const { segments, words } = await transcribe(audio, workDir, log);
+    const duration = await probeDurationSec(audio).catch(() => null);
+    return { segments, words, duration };
+  } finally {
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 // --- orchestrator: run the whole pipeline for one URL ---
 // opts: { maxClips, resolution, voiceover, voice }
 export async function makeClips(url, log = () => {}, opts = {}) {

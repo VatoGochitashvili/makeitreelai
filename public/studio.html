@@ -66,6 +66,44 @@
 
   <!-- Autopilot: the loop a clip tool doesn't close. Connect a feed once and
        episodes clip and queue themselves with nobody at the keyboard. -->
+
+  <!-- The back catalogue: the part no one-file-at-a-time tool can reach. -->
+  <section class="cat-card" id="catCard" style="display:none">
+    <div class="auto-head">
+      <div>
+        <span class="eyebrow">Back catalogue</span>
+        <h2>Mine everything you've already said</h2>
+      </div>
+      <span class="auto-state" id="catStat"></span>
+    </div>
+
+    <p class="auto-blurb" id="catBlurb">
+      Every other tool starts from the file you upload today. This reads your whole
+      history, finds what your show keeps coming back to, and pulls the best
+      answers you've ever given — from across every episode.
+    </p>
+
+    <div class="cat-actions">
+      <button class="btn sm" id="catScan">Scan my back catalogue</button>
+      <button class="btn ghost sm" id="catThemes">Find my themes</button>
+    </div>
+    <div class="auto-err" id="catErr"></div>
+
+    <div class="cat-progress" id="catProgress" style="display:none">
+      <div class="cat-bar"><div class="cat-fill" id="catFill"></div></div>
+      <div class="cat-prog-txt" id="catProgTxt"></div>
+    </div>
+
+    <div class="cat-themes" id="catThemeList"></div>
+
+    <div class="cat-search">
+      <input id="catQuery" type="text" placeholder="Or search it yourself — “burnout”, “pricing”, “how they started”…">
+      <button class="btn sm" id="catGo">Find the best moments</button>
+    </div>
+
+    <div class="cat-results" id="catResults"></div>
+  </section>
+
   <section class="auto-card" id="autoCard" style="display:none">
     <div class="auto-head">
       <div>

@@ -47,6 +47,7 @@ const go = $("go"), urlInput = $("url"), panel = $("panel"), logEl = $("log"),
 
 let ME = null;              // { user, plan, usage }
 let currentJobId = null;    // the job the Stop button acts on
+let forcedRange = null;     // a moment picked from the back catalogue
 // Bumped whenever a new poll loop starts; older loops see a stale token and
 // stop, so two loops can never drive the same progress bar.
 let pollToken = 0;
@@ -171,6 +172,148 @@ async function resumeRunningJob() {
   } catch (_) { /* nothing running */ }
 }
 
+
+
+// ---------- back catalogue ----------
+// Studio only; the panel is absent everywhere else so this whole block is
+// skipped rather than guarded call by call.
+if ($("catCard")) {
+  let catPoll = null;
+
+  const catFmt = (n) => n === 1 ? "1 episode" : n + " episodes";
+
+  async function catLoad() {
+    let d;
+    try { d = await (await fetch("/api/catalogue")).json(); } catch (_) { return; }
+    if (!d.enabled) return;
+    $("catCard").style.display = "block";
+
+    if (!d.feed) {
+      $("catBlurb").textContent = "Connect your podcast feed below and this can read your whole history — not just what you upload today.";
+      $("catScan").disabled = true;
+      $("catStat").textContent = "";
+      return;
+    }
+    $("catScan").disabled = false;
+
+    const st = d.stats;
+    $("catStat").textContent = st.episodes
+      ? `${catFmt(st.episodes)} · ${st.minutes} min indexed`
+      : "Nothing indexed yet";
+    $("catStat").className = "auto-state " + (st.episodes ? "on" : "off");
+
+    // scan progress
+    const sc = d.scan;
+    const running = sc && sc.status === "running";
+    $("catProgress").style.display = running ? "block" : "none";
+    if (running) {
+      const pct = sc.total ? Math.round((sc.done / sc.total) * 100) : 0;
+      $("catFill").style.width = pct + "%";
+      $("catProgTxt").textContent = `Reading ${sc.done + 1} of ${sc.total}` + (sc.current ? ` — ${sc.current}` : "");
+      if (!catPoll) catPoll = setInterval(catLoad, 4000);
+    } else if (catPoll) {
+      clearInterval(catPoll); catPoll = null;
+    }
+    if (sc && sc.status === "error") $("catErr").textContent = sc.error || "That scan failed.";
+
+    if (d.themes && d.themes.length) {
+      $("catThemeList").innerHTML = d.themes.map((t) => `
+        <button class="cat-theme" data-q="${escapeHtml(t.label)}">
+          <b>${escapeHtml(t.label)}</b>
+          <span>${escapeHtml(t.angle || "")}</span>
+        </button>`).join("");
+      $("catThemeList").querySelectorAll(".cat-theme").forEach((b) =>
+        b.addEventListener("click", () => { $("catQuery").value = b.dataset.q; catMine(); }));
+    }
+  }
+
+  $("catScan").addEventListener("click", async () => {
+    $("catErr").textContent = "";
+    const btn = $("catScan"); btn.disabled = true;
+    try {
+      const q = await (await fetch("/api/catalogue/quote")).json();
+      if (q.error) { $("catErr").textContent = q.error; btn.disabled = false; return; }
+      if (!q.thisBatch) { $("catErr").textContent = "Everything in this feed is already indexed."; btn.disabled = false; return; }
+      // Transcribing a back catalogue costs real money — quote it, don't surprise them.
+      const ok = confirm(
+        `Read ${q.thisBatch} episode${q.thisBatch > 1 ? "s" : ""} of "${q.show}"?\n\n` +
+        `About ${q.estimatedMinutes} minutes of audio, roughly $${q.estimatedCost.toFixed(2)} of transcription.\n` +
+        `${q.unscanned} episode${q.unscanned > 1 ? "s are" : " is"} not indexed yet.\n\n` +
+        `This runs in the background — you can close the tab.`);
+      if (!ok) { btn.disabled = false; return; }
+      await fetch("/api/catalogue/scan", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ limit: q.thisBatch }),
+      });
+      catLoad();
+    } catch (_) { $("catErr").textContent = "Couldn't start the scan."; }
+    btn.disabled = false;
+  });
+
+  $("catThemes").addEventListener("click", async () => {
+    const btn = $("catThemes");
+    btn.disabled = true; btn.textContent = "Reading…";
+    $("catErr").textContent = "";
+    try {
+      const d = await (await fetch("/api/catalogue/themes", { method: "POST" })).json();
+      if (d.error) $("catErr").textContent = d.error;
+      else catLoad();
+    } catch (_) { $("catErr").textContent = "Couldn't work out your themes."; }
+    btn.disabled = false; btn.textContent = "Find my themes";
+  });
+
+  async function catMine() {
+    const q = $("catQuery").value.trim();
+    if (!q) return;
+    $("catErr").textContent = "";
+    $("catResults").innerHTML = `<div class="cat-empty">Reading every episode for “${escapeHtml(q)}”…</div>`;
+    try {
+      const d = await (await fetch("/api/catalogue/mine", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ query: q }),
+      })).json();
+      if (d.error) { $("catResults").innerHTML = ""; $("catErr").textContent = d.error; return; }
+      if (!d.moments.length) {
+        $("catResults").innerHTML = `<div class="cat-empty">Nothing on “${escapeHtml(q)}” in the ${catFmt(d.searched)} indexed so far.</div>`;
+        return;
+      }
+      $("catResults").innerHTML = `
+        <div class="cat-found">${d.moments.length} moments across ${catFmt(d.episodesMatched)}, from ${catFmt(d.searched)} searched</div>` +
+        d.moments.map((m, i) => `
+        <div class="cat-hit">
+          <div class="cat-hit-top">
+            <b>${escapeHtml(m.title)}</b>
+            <span>${m.seconds}s</span>
+          </div>
+          <div class="cat-quote">“${escapeHtml(m.quote || "")}”</div>
+          <div class="cat-meta">
+            <span>${escapeHtml(m.episodeTitle)}</span>
+            <span>${fmtTime(m.start)}–${fmtTime(m.end)}</span>
+          </div>
+          <div class="cat-why">${escapeHtml(m.why || "")}</div>
+          <button class="btn ghost sm cat-make" data-i="${i}">Make this clip</button>
+        </div>`).join("");
+
+      $("catResults").querySelectorAll(".cat-make").forEach((b) =>
+        b.addEventListener("click", () => {
+          const m = d.moments[+b.dataset.i];
+          // Hand it to the normal generate path with the moment as the range.
+          activeSource = "link";
+          urlInput.value = m.episodeUrl;
+          forcedRange = { start: m.start, end: m.end };
+          b.textContent = "Starting…"; b.disabled = true;
+          start(false).finally(() => { forcedRange = null; });
+        }));
+    } catch (_) {
+      $("catResults").innerHTML = "";
+      $("catErr").textContent = "That search failed.";
+    }
+  }
+  $("catGo").addEventListener("click", catMine);
+  $("catQuery").addEventListener("keydown", (e) => { if (e.key === "Enter") catMine(); });
+
+  catLoad();
+}
 
 // ---------- autopilot ----------
 // The whole point is that this runs without anyone here, so the UI is mostly
@@ -389,8 +532,12 @@ function currentSettings() {
     voiceover: !voToggle.disabled && voToggle.checked,
     voice: voVoice.value,
   };
-  // Only send a range when it isn't the whole video.
-  if (rangeSel && videoDuration && (rangeSel.start > 0 || rangeSel.end < videoDuration - 1)) {
+  // Only send a range when it isn't the whole video — except when a catalogue
+  // moment set one deliberately, where the whole point is that exact window and
+  // there is no loaded preview to measure it against.
+  if (forcedRange) {
+    out.range = { start: Math.round(forcedRange.start), end: Math.round(forcedRange.end) };
+  } else if (rangeSel && videoDuration && (rangeSel.start > 0 || rangeSel.end < videoDuration - 1)) {
     out.range = { start: Math.round(rangeSel.start), end: Math.round(rangeSel.end) };
   }
   return out;

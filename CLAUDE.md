@@ -110,6 +110,24 @@ Kinetic Captions, Smart Frame (not AI Reframe), Autopilot (not Social
 scheduler), Cutaways (not AI B-Roll), Crew, Edit Room, Cover Art, Brand Kit,
 Timeline Export, Reel API, Agent Bridge, Showcase, Director.
 
+## Back catalogue miner (`src/catalogue.js`)
+The thing no one-file-at-a-time tool can do. It transcribes a show's whole
+history once, names the themes it keeps returning to, then finds the strongest
+moments on a theme *across every episode* — "you've talked about burnout in
+fourteen episodes, here are the six best answers".
+
+- transcripts only, audio-only download: a 45-min episode is ~$0.27 and a few MB
+- `/api/catalogue/quote` prices a scan before it runs; the UI shows the figure
+  and asks. Never start a scan without that — a 100-episode catalogue is real money
+- capped at 40 episodes per scan
+- mining narrows by keyword first so only matching episodes reach the model
+- a scan is an in-process loop, so a restart marks it interrupted and keeps what
+  it already read
+
+Why it matters commercially: it delivers value on day one from work the customer
+already did, and it compounds — a competitor can't ship it as a feature because
+they'd need the history.
+
 ## Roadmap / good next tasks
 1. **Animated word-by-word captions** — build an `.ass` subtitle file from Whisper word timestamps, burn with ffmpeg. Biggest quality win.
 2. **Face-tracking reframe** — `findSubjectX` is a motion-energy heuristic that
