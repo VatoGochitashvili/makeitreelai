@@ -101,7 +101,10 @@ nav.site {
   backdrop-filter: blur(26px) saturate(140%);
   border-bottom: 1px solid rgba(255, 255, 255, .06);
 }
-nav.site .wrap { display: flex; align-items: center; height: 84px; gap: 20px; }
+/* The bar carries more than a column of body copy does — three tool links, four
+   marketing links and up to four account controls. Give it more room than the
+   1140px content wrap, or the right-hand buttons hang off the end. */
+nav.site .wrap { display: flex; align-items: center; height: 84px; gap: 20px; max-width: 1360px; }
 
 /* Two groups: the three ways into the tool, then the marketing pages. */
 .nav-group { display: flex; align-items: center; gap: 20px; flex: 0 0 auto; }
@@ -140,7 +143,10 @@ nav.site .nav-right { margin-left: auto; }
    swapping it a moment later reads as being signed out unexpectedly. */
 .nav-right.resolving > * { opacity: 0; pointer-events: none; }
 .nav-right > * { transition: opacity var(--t); }
-@media (max-width: 1120px) { .nav-marketing, .nav-sep { display: none; } }
+/* The bar is taller and busier than it was; signed in it also carries Studio,
+   My Reels, a plan pill and Log out. Drop the marketing links before they
+   push the account buttons off the right edge. */
+@media (max-width: 1300px) { .nav-marketing, .nav-sep { display: none; } }
 @media (max-width: 780px) { .nav-links { display: none; } }
 
 /* ---------- buttons ---------- */
@@ -1115,3 +1121,35 @@ body.studio .tool { max-width: 100%; }
 
 @media (max-width: 1100px) { .fm-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 620px) { .fm-grid { grid-template-columns: 1fr; } .feat-menu { max-height: 70vh; overflow-y: auto; } }
+
+/* ---------- features page ---------- */
+.fp-main { padding: 40px 24px 100px; max-width: 1000px; }
+.fp-head { text-align: center; margin-bottom: 54px; }
+.fp-head h1 { font-size: clamp(30px, 4.4vw, 48px); letter-spacing: -.03em; margin-bottom: 14px; }
+.fp-head p { color: var(--muted); font-size: 16px; max-width: 620px; margin: 0 auto; line-height: 1.6; }
+.fp-head b { color: var(--text); font-weight: 700; }
+
+.fp-group {
+  font-size: 12px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted);
+  font-weight: 700; margin: 46px 0 18px; padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.fp-row {
+  display: grid; grid-template-columns: 1fr 300px; gap: 32px; align-items: center;
+  padding: 22px; border-radius: 16px; border: 1px solid transparent;
+  transition: border-color var(--t), background var(--t);
+  scroll-margin-top: 110px;
+}
+.fp-row:hover { border-color: var(--line); background: rgba(255, 255, 255, .02); }
+/* a link from the menu lands here — say so for a moment */
+.fp-row:target { border-color: rgba(168, 85, 247, .5); background: rgba(168, 85, 247, .06); }
+.fp-copy h3 { font-size: 21px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.fp-copy p { color: var(--muted); font-size: 15px; line-height: 1.6; max-width: 52ch; }
+.fp-demo { width: 100%; }
+
+.fp-cta { text-align: center; margin-top: 60px; }
+
+@media (max-width: 760px) {
+  .fp-row { grid-template-columns: 1fr; gap: 18px; }
+  .fp-demo { max-width: 340px; }
+}

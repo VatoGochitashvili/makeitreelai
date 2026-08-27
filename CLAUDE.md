@@ -72,6 +72,15 @@ Still simulated: actual publishing. `src/scheduler.js` flips due posts to
 "posted" without calling TikTok/Instagram/YouTube. Those APIs need registered
 apps, OAuth, and (for TikTok) an audit — start the applications early.
 
+## Features page
+`public/features.html` lists all sixteen, each with a CSS-only animated demo of
+the mechanism (`public/demos.css`). No JS, so a demo can't fail to start, and
+they all stop under `prefers-reduced-motion`. The nav's Features menu links
+here by anchor.
+
+If you add a feature, it needs three things in step: an entry in the menu and
+the on-page grid, a row on features.html, and a demo in demos.css.
+
 ## Feature naming
 The nav's Features menu and the on-page grid share one source: the list is
 generated, and every entry carries a Live or Soon badge. Six are Live (Moment

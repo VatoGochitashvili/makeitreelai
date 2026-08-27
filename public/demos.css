@@ -1,0 +1,242 @@
+/* Animated feature demos.
+   One shared box, CSS-only so nothing depends on JS running, and every
+   animation shows the actual mechanism rather than decorating the card. */
+
+.dm {
+  position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 12px;
+  background: linear-gradient(160deg, #12131f, #0b0c14);
+  border: 1px solid rgba(255, 255, 255, .07);
+  overflow: hidden; display: grid; place-items: center;
+}
+.dm i, .dm b, .dm span { display: block; }
+
+/* Moment Finder — a scan sweeps the timeline and the keepers light up */
+.dm-scan .dm-track { display: flex; gap: 5px; width: 78%; }
+.dm-scan .dm-seg { flex: 1; height: 26px; border-radius: 4px; background: rgba(255,255,255,.07); }
+.dm-scan .dm-seg.hit { animation: seg-hit 3.4s ease-in-out infinite; }
+.dm-scan .dm-seg.hit.d2 { animation-delay: .55s; }
+.dm-scan .dm-seg.hit.d3 { animation-delay: 1.1s; }
+@keyframes seg-hit {
+  0%, 14% { background: rgba(255,255,255,.07); transform: scaleY(1); }
+  22%, 72% { background: linear-gradient(180deg, #a855f7, #ec4899); transform: scaleY(1.5); }
+  85%, 100% { background: rgba(255,255,255,.07); transform: scaleY(1); }
+}
+.dm-scan .dm-sweep {
+  position: absolute; top: 18%; bottom: 18%; width: 2px; border-radius: 2px;
+  background: linear-gradient(180deg, transparent, #67e8f9, transparent);
+  box-shadow: 0 0 12px #67e8f9; animation: sweep 3.4s linear infinite;
+}
+@keyframes sweep { 0% { left: 11%; } 60%, 100% { left: 89%; } }
+.dm-scan .dm-scores { position: absolute; bottom: 14%; display: flex; gap: 26px; }
+.dm-scan .dm-scores b {
+  font-size: 10px; font-weight: 800; color: #f0abfc; opacity: 0;
+  animation: score-in 3.4s ease-in-out infinite;
+}
+.dm-scan .dm-scores b.d2 { animation-delay: .55s; }
+.dm-scan .dm-scores b.d3 { animation-delay: 1.1s; }
+@keyframes score-in { 0%, 18% { opacity: 0; transform: translateY(4px); } 26%, 74% { opacity: 1; transform: none; } 88%, 100% { opacity: 0; } }
+
+/* Gameplay Shorts — clip on top, gameplay scrolling underneath */
+.dm-split .dm-phone {
+  width: 30%; height: 84%; border-radius: 8px; overflow: hidden; position: relative;
+  border: 1px solid rgba(255,255,255,.12); display: flex; flex-direction: column;
+}
+.dm-split .dm-top { flex: 1; background: linear-gradient(160deg, #24304a, #161d2e); display: grid; place-items: center; }
+.dm-split .dm-head { width: 26%; aspect-ratio: 1; border-radius: 50%; background: #d9a066; }
+.dm-split .dm-bot { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 2px; background: #0d2818; }
+.dm-split .dm-bot i { background: #2f7d4f; border-radius: 2px; animation: gp 1.6s linear infinite; }
+.dm-split .dm-bot i:nth-child(2n) { background: #3d9c63; animation-delay: -.4s; }
+.dm-split .dm-bot i:nth-child(3n) { background: #256b41; animation-delay: -.8s; }
+@keyframes gp { 0% { transform: translateY(0); opacity: 1; } 50% { transform: translateY(-3px); opacity: .75; } 100% { transform: translateY(0); opacity: 1; } }
+.dm-split .dm-cap {
+  position: absolute; left: 0; right: 0; top: 46%; text-align: center;
+  font-size: 7px; font-weight: 900; color: #fff; text-shadow: 0 1px 2px #000;
+  animation: cap-pop 2.2s ease-in-out infinite;
+}
+@keyframes cap-pop { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+
+/* Kinetic Captions — one word at a time, in time with the speech */
+.dm-caps { gap: 6px; display: flex; flex-wrap: wrap; justify-content: center; padding: 0 12%; }
+.dm-caps .w {
+  font-size: clamp(11px, 2.4vw, 15px); font-weight: 900; letter-spacing: -.01em;
+  color: #fff; opacity: .18; transform: translateY(2px);
+  animation: word 2.8s steps(1, end) infinite;
+}
+.dm-caps .w:nth-child(1) { animation-delay: 0s; }
+.dm-caps .w:nth-child(2) { animation-delay: .4s; }
+.dm-caps .w:nth-child(3) { animation-delay: .8s; }
+.dm-caps .w:nth-child(4) { animation-delay: 1.2s; }
+@keyframes word {
+  0%, 12% { opacity: 1; color: #f0abfc; transform: translateY(-2px); }
+  13%, 100% { opacity: .18; color: #fff; transform: translateY(2px); }
+}
+
+/* Smart Frame — the crop window moves onto the speaker and resizes */
+.dm-frame .dm-wide {
+  position: relative; width: 82%; aspect-ratio: 16/9; border-radius: 6px;
+  background: linear-gradient(160deg, #1c2740, #131a2b); border: 1px solid rgba(255,255,255,.08);
+}
+.dm-frame .dm-subject {
+  position: absolute; top: 26%; left: 30%; width: 13%; aspect-ratio: 1;
+  border-radius: 50%; background: #d9a066;
+}
+.dm-frame .dm-crop {
+  position: absolute; top: 50%; height: 62%; aspect-ratio: 9/16;
+  border: 2px solid #a855f7; border-radius: 4px;
+  box-shadow: 0 0 0 999px rgba(4, 5, 10, .55);
+  animation: crop 5.4s ease-in-out infinite;
+}
+@keyframes crop {
+  0%, 22%   { left: 50%; transform: translate(-50%, -50%) scaleX(1); }
+  33%, 55%  { left: 38%; transform: translate(-50%, -50%) scaleX(1); }
+  66%, 88%  { left: 38%; transform: translate(-50%, -50%) scaleX(1.6); }
+  100%      { left: 50%; transform: translate(-50%, -50%) scaleX(1); }
+}
+.dm-frame .dm-labels { position: absolute; bottom: 7%; display: flex; gap: 12px; font-size: 8.5px; color: var(--muted); }
+.dm-frame .dm-labels span { animation: lbl 5.4s steps(1, end) infinite; }
+.dm-frame .dm-labels span:nth-child(2) { animation-delay: -3.6s; }
+.dm-frame .dm-labels span:nth-child(3) { animation-delay: -1.8s; }
+@keyframes lbl { 0%, 33% { color: #f0abfc; } 34%, 100% { color: #6a6d80; } }
+
+/* Voice Over — a waveform that actually speaks in bursts */
+.dm-wave { display: flex; gap: 4px; align-items: center; height: 100%; }
+.dm-wave i { width: 4px; border-radius: 2px; background: linear-gradient(180deg, #a855f7, #ec4899); animation: wv 1.1s ease-in-out infinite; }
+.dm-wave i:nth-child(1) { animation-delay: -.9s } .dm-wave i:nth-child(2) { animation-delay: -.8s }
+.dm-wave i:nth-child(3) { animation-delay: -.7s } .dm-wave i:nth-child(4) { animation-delay: -.6s }
+.dm-wave i:nth-child(5) { animation-delay: -.5s } .dm-wave i:nth-child(6) { animation-delay: -.4s }
+.dm-wave i:nth-child(7) { animation-delay: -.3s } .dm-wave i:nth-child(8) { animation-delay: -.2s }
+.dm-wave i:nth-child(9) { animation-delay: -.1s } .dm-wave i:nth-child(10){ animation-delay: 0s }
+.dm-wave i:nth-child(11){ animation-delay: -.35s } .dm-wave i:nth-child(12){ animation-delay: -.65s }
+@keyframes wv { 0%, 100% { height: 12%; } 50% { height: 68%; } }
+
+/* Autopilot — an episode arrives and fills the week by itself */
+.dm-auto .dm-feed {
+  position: absolute; left: 10%; top: 50%; transform: translateY(-50%);
+  font-size: 8px; font-weight: 800; letter-spacing: .06em; color: #67e8f9;
+  border: 1px solid rgba(103,232,249,.4); border-radius: 5px; padding: 4px 6px;
+}
+.dm-auto .dm-flow {
+  position: absolute; left: 26%; top: 50%; width: 6px; height: 6px; border-radius: 50%;
+  background: #67e8f9; box-shadow: 0 0 10px #67e8f9; animation: flow 2.6s ease-in-out infinite;
+}
+@keyframes flow { 0% { left: 26%; opacity: 0; } 15% { opacity: 1; } 75% { left: 62%; opacity: 1; } 100% { left: 62%; opacity: 0; } }
+.dm-auto .dm-days { position: absolute; right: 9%; display: flex; gap: 5px; }
+.dm-auto .dm-days b {
+  width: 15px; height: 22px; border-radius: 4px; background: rgba(255,255,255,.06);
+  font-size: 7px; color: var(--muted); display: grid; place-items: center;
+  animation: dayfill 2.6s ease-in-out infinite;
+}
+.dm-auto .dm-days b:nth-child(2) { animation-delay: .16s }
+.dm-auto .dm-days b:nth-child(3) { animation-delay: .32s }
+.dm-auto .dm-days b:nth-child(4) { animation-delay: .48s }
+.dm-auto .dm-days b:nth-child(5) { animation-delay: .64s }
+@keyframes dayfill {
+  0%, 55% { background: rgba(255,255,255,.06); color: #6a6d80; }
+  70%, 92% { background: linear-gradient(160deg, #a855f7, #ec4899); color: #fff; }
+  100% { background: rgba(255,255,255,.06); color: #6a6d80; }
+}
+
+/* Director — a messy pile resolves into one cut */
+.dm-director { gap: 10px; display: flex; }
+.dm-director .dm-raw { display: flex; gap: 3px; }
+.dm-director .dm-raw i {
+  width: 8px; height: 30px; border-radius: 2px; background: rgba(255,255,255,.13);
+  animation: tidy 3.2s ease-in-out infinite;
+}
+.dm-director .dm-raw i:nth-child(2){ animation-delay: .1s } .dm-director .dm-raw i:nth-child(3){ animation-delay: .2s }
+.dm-director .dm-raw i:nth-child(4){ animation-delay: .3s } .dm-director .dm-raw i:nth-child(5){ animation-delay: .4s }
+@keyframes tidy { 0%, 100% { transform: rotate(-8deg) translateY(3px); } 50% { transform: none; } }
+.dm-director .dm-arrow { width: 16px; height: 1px; background: rgba(255,255,255,.3); position: relative; }
+.dm-director .dm-arrow::after { content: ""; position: absolute; right: 0; top: -2px; border-left: 4px solid rgba(255,255,255,.4); border-top: 2.5px solid transparent; border-bottom: 2.5px solid transparent; }
+.dm-director .dm-cut { width: 42px; height: 30px; border-radius: 4px; background: linear-gradient(160deg, #a855f7, #ec4899); animation: pulse 3.2s ease-in-out infinite; }
+@keyframes pulse { 0%, 40% { opacity: .35; } 60%, 100% { opacity: 1; } }
+
+/* Cover Art — a thumbnail assembling itself */
+.dm-cover .dm-thumb {
+  width: 58%; aspect-ratio: 16/9; border-radius: 6px; position: relative;
+  background: linear-gradient(160deg, #24304a, #161d2e); border: 1px solid rgba(255,255,255,.1);
+}
+.dm-cover .dm-face { position: absolute; right: 12%; top: 22%; width: 22%; aspect-ratio: 1; border-radius: 50%; background: #d9a066; animation: pop 3s ease-in-out infinite; }
+.dm-cover .dm-title { position: absolute; left: 9%; top: 34%; width: 42%; height: 7px; border-radius: 2px; background: #fff; animation: slidein 3s ease-in-out infinite; }
+.dm-cover .dm-title.s { top: 50%; width: 28%; opacity: .5; animation-delay: .18s; }
+@keyframes slidein { 0%, 12% { transform: translateX(-14px); opacity: 0; } 30%, 88% { transform: none; opacity: 1; } 100% { opacity: 0; } }
+@keyframes pop { 0%, 20% { transform: scale(.5); opacity: 0; } 38%, 88% { transform: scale(1); opacity: 1; } 100% { opacity: 0; } }
+
+/* Brand Kit — one palette lands on every clip */
+.dm-brand .dm-screen { width: 46%; aspect-ratio: 16/9; border-radius: 6px; background: #161d2e; border: 2px solid rgba(255,255,255,.12); animation: brandify 3.6s ease-in-out infinite; }
+@keyframes brandify { 0%, 30% { border-color: rgba(255,255,255,.12); } 50%, 100% { border-color: #ec4899; box-shadow: 0 0 18px rgba(236,72,153,.35); } }
+.dm-brand .dm-swatches { position: absolute; bottom: 14%; display: flex; gap: 6px; }
+.dm-brand .dm-swatches i { width: 12px; height: 12px; border-radius: 3px; animation: swatch 3.6s ease-in-out infinite; }
+.dm-brand .dm-swatches i:nth-child(1) { background: #a855f7 }
+.dm-brand .dm-swatches i:nth-child(2) { background: #ec4899; animation-delay: .12s }
+.dm-brand .dm-swatches i:nth-child(3) { background: #67e8f9; animation-delay: .24s }
+@keyframes swatch { 0%, 25% { transform: translateY(6px); opacity: 0; } 45%, 100% { transform: none; opacity: 1; } }
+
+/* Cutaways — B-roll drops in over the talking */
+.dm-broll .dm-main { width: 58%; aspect-ratio: 16/9; border-radius: 6px; background: linear-gradient(160deg, #24304a, #161d2e); }
+.dm-broll .dm-inset {
+  position: absolute; width: 30%; aspect-ratio: 16/9; border-radius: 5px;
+  background: linear-gradient(160deg, #a855f7, #ec4899);
+  animation: broll 3.4s ease-in-out infinite;
+}
+@keyframes broll {
+  0%, 22% { transform: translate(40px, 14px) scale(.7); opacity: 0; }
+  38%, 74% { transform: translate(26px, 10px) scale(1); opacity: 1; }
+  90%, 100% { transform: translate(40px, 14px) scale(.7); opacity: 0; }
+}
+
+/* Edit Room — nudge a cut on the timeline */
+.dm-edit { flex-direction: column; gap: 6px; display: flex; }
+.dm-edit .dm-lane { width: 70%; height: 16px; border-radius: 4px; background: rgba(255,255,255,.05); position: relative; }
+.dm-edit .dm-clip { position: absolute; left: 8%; top: 2px; bottom: 2px; width: 46%; border-radius: 3px; background: linear-gradient(90deg, #a855f7, #c084fc); animation: trim 3.2s ease-in-out infinite; }
+.dm-edit .dm-clip.b { left: 22%; width: 40%; background: linear-gradient(90deg, #ec4899, #f0abfc); animation: none; }
+.dm-edit .dm-handle { position: absolute; top: -2px; bottom: -2px; width: 3px; border-radius: 2px; background: #67e8f9; box-shadow: 0 0 8px #67e8f9; animation: handle 3.2s ease-in-out infinite; }
+@keyframes trim { 0%, 100% { width: 46%; } 50% { width: 62%; } }
+@keyframes handle { 0%, 100% { left: 54%; } 50% { left: 70%; } }
+
+/* Crew — separate people, one library */
+.dm-crew .dm-av { position: absolute; width: 18px; height: 18px; border-radius: 50%; border: 2px solid #0b0c14; }
+.dm-crew .dm-av { left: 32%; top: 26%; background: #a855f7; animation: gather 3.4s ease-in-out infinite; }
+.dm-crew .dm-av.a2 { left: 48%; top: 20%; background: #ec4899; animation-delay: .12s; }
+.dm-crew .dm-av.a3 { left: 62%; top: 28%; background: #67e8f9; animation-delay: .24s; }
+@keyframes gather { 0%, 100% { transform: translateY(-6px); opacity: .55; } 50% { transform: none; opacity: 1; } }
+.dm-crew .dm-shared { position: absolute; bottom: 22%; width: 44%; height: 22px; border-radius: 5px; background: rgba(255,255,255,.07); border: 1px dashed rgba(255,255,255,.2); }
+
+/* Timeline Export — the cut leaves as an edit list */
+.dm-export { flex-direction: column; gap: 10px; display: flex; }
+.dm-export .dm-lane.x { width: 62%; height: 18px; display: flex; gap: 3px; }
+.dm-export .dm-clip { flex: 1; border-radius: 3px; background: #a855f7; animation: handoff 3s ease-in-out infinite; }
+.dm-export .dm-clip.b { background: #ec4899; animation-delay: .12s; }
+.dm-export .dm-clip:nth-child(3) { animation-delay: .24s; }
+@keyframes handoff { 0%, 45% { transform: none; opacity: 1; } 70%, 100% { transform: translateY(14px); opacity: .25; } }
+.dm-export .dm-xml { font-size: 8px; font-weight: 800; letter-spacing: .1em; color: #67e8f9; border: 1px solid rgba(103,232,249,.4); border-radius: 4px; padding: 3px 7px; animation: xmlin 3s ease-in-out infinite; }
+@keyframes xmlin { 0%, 55% { opacity: 0; transform: translateY(-6px); } 75%, 100% { opacity: 1; transform: none; } }
+
+/* Reel API — one call, clips back */
+.dm-api { flex-direction: column; gap: 10px; display: flex; }
+.dm-api .dm-req { font-size: 9px; font-family: ui-monospace, monospace; color: #67e8f9; background: rgba(103,232,249,.09); border: 1px solid rgba(103,232,249,.28); border-radius: 5px; padding: 4px 8px; }
+.dm-api .dm-out { display: flex; gap: 5px; }
+.dm-api .dm-out i { width: 13px; height: 22px; border-radius: 3px; background: linear-gradient(160deg, #a855f7, #ec4899); animation: apiout 2.6s ease-in-out infinite; }
+.dm-api .dm-out i:nth-child(2) { animation-delay: .14s } .dm-api .dm-out i:nth-child(3) { animation-delay: .28s }
+@keyframes apiout { 0%, 25% { transform: translateY(-8px); opacity: 0; } 45%, 88% { transform: none; opacity: 1; } 100% { opacity: 0; } }
+
+/* Agent Bridge — an agent drives it with no browser */
+.dm-bridge { display: flex; align-items: center; gap: 8px; }
+.dm-bridge .dm-node { font-size: 8px; font-weight: 700; color: var(--muted); border: 1px solid rgba(255,255,255,.16); border-radius: 5px; padding: 5px 8px; }
+.dm-bridge .dm-node.r { color: #f0abfc; border-color: rgba(240,171,252,.4); }
+.dm-bridge .dm-link { width: 44px; height: 2px; border-radius: 2px; background: rgba(255,255,255,.14); position: relative; overflow: hidden; }
+.dm-bridge .dm-link::after { content: ""; position: absolute; top: 0; bottom: 0; width: 12px; background: #67e8f9; box-shadow: 0 0 8px #67e8f9; animation: packet 1.8s linear infinite; }
+@keyframes packet { 0% { left: -14px; } 100% { left: 46px; } }
+
+/* Showcase — a wall of real outputs */
+.dm-gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; width: 58%; }
+.dm-gallery i { aspect-ratio: 9/16; border-radius: 3px; background: linear-gradient(160deg, #2a3350, #171e30); animation: tile 3.6s ease-in-out infinite; }
+.dm-gallery i:nth-child(2){ animation-delay: .2s } .dm-gallery i:nth-child(3){ animation-delay: .4s }
+.dm-gallery i:nth-child(4){ animation-delay: .6s } .dm-gallery i:nth-child(5){ animation-delay: .8s }
+.dm-gallery i:nth-child(6){ animation-delay: 1s }
+@keyframes tile { 0%, 100% { background: linear-gradient(160deg, #2a3350, #171e30); } 50% { background: linear-gradient(160deg, #a855f7, #ec4899); } }
+
+/* Movement is the point here, but not at the cost of anyone who can't take it. */
+@media (prefers-reduced-motion: reduce) {
+  .dm *, .dm { animation: none !important; }
+}
