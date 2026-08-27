@@ -8,7 +8,7 @@ import { makeClips, synthSpeech, probeVideoMeta, probeDurationSec, withAiLogger,
 import { createWriteStream } from "node:fs";
 import { authRouter, attachUser, getUsage, bumpVideoUsage, refundVideoUsage, findUserById } from "./src/auth.js";
 import { schedulerRouter, schedulePost } from "./src/scheduler.js";
-import { reelsRouter, addReels } from "./src/reels.js";
+import { reelsRouter, addReels, startRetentionSweep, retentionDays } from "./src/reels.js";
 import { planOf, VOICE_IDS } from "./src/plans.js";
 import { DATA_DIR } from "./src/store.js";
 import { fetchPodcastFeed, normalizeUrl, isDirectMedia } from "./src/sources.js";
@@ -202,7 +202,7 @@ app.post("/api/clip", async (req, res) => {
   };
   const chosenLength = ["auto", "short", "medium", "long"].includes(length) ? length : "auto";
   const chosenMotion = ["none", "subtle", "strong"].includes(motion) ? motion : "subtle";
-  const chosenLayout = ["crop", "fit"].includes(layout) ? layout : "crop";
+  const chosenLayout = ["crop", "fit", "balanced"].includes(layout) ? layout : "balanced";
 
   // Gameplay-backed formats. "brainrot" replaces the audio with a synthetic
   // voice, so it needs the same plan capability as any other voiceover.
@@ -364,6 +364,9 @@ export function startJob(user, o) {
 // Episodes clip themselves once a feed is connected. Started here because it
 // needs startJob, which is defined just above.
 initAutopilot({ startJob, findUser: findUserById, schedulePost });
+
+// Clips are the biggest thing on disk and nothing was reclaiming them.
+startRetentionSweep((msg) => console.log("  " + msg));
 
 // Video preview: title, author, thumbnail and — crucially — duration, which
 // the range selector needs. yt-dlp gives the real duration; oEmbed is the

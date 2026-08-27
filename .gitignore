@@ -15,3 +15,7 @@ cookies*.txt
 yt-cookies*
 assets/backgrounds/*
 !assets/backgrounds/README.md
+
+# macOS
+.DS_Store
+**/.DS_Store

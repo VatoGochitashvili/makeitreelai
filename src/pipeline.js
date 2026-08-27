@@ -886,7 +886,47 @@ async function cutClip(videoPath, clip, index, workDir, resolution, caption, log
   // then center-crop. Scaling only the width broke on landscape videos.
   const filters = [];
 
-  if (layout === "fit") {
+  if (layout === "balanced") {
+    // The middle ground, and the default.
+    //
+    // A full-bleed 9:16 crop of a 16:9 source keeps only ~32% of the width and
+    // magnifies 1.78x — that's geometry, not a setting, and it's why clips come
+    // out feeling shoved in the speaker's face. "fit" avoids it but leaves the
+    // video tiny. So: keep roughly half the width, sized so the picture fills
+    // about two thirds of the frame height, and blur-fill the rest.
+    const d = await probeDims(videoPath);
+    const targetH = Math.round(H * 0.66);
+    // Width of source we can keep while the picture still reaches targetH.
+    let cropW = d ? Math.min(d.w, Math.round(d.h * (W / targetH))) : null;
+
+    if (!d || cropW >= d.w - 2) {
+      // Already tall enough (portrait or square source) — nothing to trim.
+      filters.push(
+        `split=2[bg][fg]`,
+        `[bg]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},` +
+          `boxblur=28:2,eq=brightness=-0.16:saturation=0.85[bgb]`,
+        `[fg]scale=${W}:-2[fgs]`,
+        `[bgb][fgs]overlay=(W-w)/2:(H-h)/2`
+      );
+    } else {
+      cropW = cropW - (cropW % 2);
+      // Centre the kept slice on the speaker, then clamp inside the frame.
+      const target = subjectX == null ? 0.5 : 0.5 + (subjectX - 0.5) * 0.85;
+      let xOff = Math.round(d.w * target - cropW / 2);
+      xOff = Math.min(Math.max(xOff, 0), d.w - cropW);
+      xOff -= xOff % 2;
+      log(`  keeping ${Math.round((cropW / d.w) * 100)}% of the frame width ` +
+          `(a full crop would keep ${Math.round((d.h * W / H / d.w) * 100)}%)`);
+      filters.push(
+        `split=2[bg][fg]`,
+        `[bg]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},` +
+          `boxblur=28:2,eq=brightness=-0.16:saturation=0.85[bgb]`,
+        `[fg]crop=${cropW}:${d.h}:${xOff}:0,scale=${W}:-2[fgs]`,
+        // Sit slightly above centre so bottom captions don't land on the face.
+        `[bgb][fgs]overlay=(W-w)/2:(H-h)*0.42`
+      );
+    }
+  } else if (layout === "fit") {
     // Nothing is cropped: the whole frame sits on a blurred fill of itself.
     // Best when the shot is wide, has several people, or shows something on
     // screen that a crop would destroy.
@@ -1245,7 +1285,7 @@ export async function makeClips(url, log = () => {}, opts = {}) {
   const lengthPref = opts.length || "auto";
   const range = opts.range || null; // { start, end } seconds, or null for the whole video
   const motion = ["none", "subtle", "strong"].includes(opts.motion) ? opts.motion : "subtle";
-  const layout = ["crop", "fit"].includes(opts.layout) ? opts.layout : "crop";
+  const layout = ["crop", "fit", "balanced"].includes(opts.layout) ? opts.layout : "balanced";
   // "split" and "brainrot" need gameplay footage to sit under the clip; without
   // a background there is nothing to render, so fall back to a standard clip.
   let format = FORMATS[opts.format] ? opts.format : "clip";
@@ -1319,7 +1359,7 @@ export async function makeClips(url, log = () => {}, opts = {}) {
       // Where is the speaker in this moment? (two-phase analyses the section
       // once it's been fetched, below — there's no full file to sample yet.)
       let subjectX = null;
-      if (layout === "crop" && !twoPhase && format !== "brainrot") {
+      if (layout !== "fit" && !twoPhase && format !== "brainrot") {
         subjectX = await findSubjectX(video, moments[i].start,
           moments[i].end - moments[i].start, log).catch(() => null);
       }
@@ -1342,21 +1382,21 @@ export async function makeClips(url, log = () => {}, opts = {}) {
         const localWords = words.map((w) =>
           ({ ...w, start: w.start - moments[i].start, end: w.end - moments[i].start }));
         // Only worth sampling when something will actually be cropped to a subject.
-        const needsSubject = format === "split" || layout === "crop";
+        const needsSubject = format === "split" || layout !== "fit";
         const secSubject = needsSubject
           ? await findSubjectX(sec, 0, moments[i].end - moments[i].start, log).catch(() => null)
           : null;
         file = format === "split"
           ? await cutSplit(sec, local, i, workDir, resolution, caption, log, localWords, background, secSubject)
           : await cutClip(sec, local, i, workDir, resolution, caption, log, localWords,
-                          motion, layout, layout === "crop" ? secSubject : null);
+                          motion, layout, layout === "fit" ? null : secSubject);
       } else if (isAudioOnly) {
         // There is no picture to stack — an audiogram already fills the frame.
         if (format === "split") log("  audio-only source — rendering an audiogram instead of a split screen.");
         file = await cutAudiogram(video, moments[i], i, workDir, resolution, caption, log);
       } else if (format === "split") {
-        file = await cutSplit(video, moments[i], i, workDir, resolution, caption, log, words, background,
-          await findSubjectX(video, moments[i].start, moments[i].end - moments[i].start, log).catch(() => null));
+        // subjectX was already sampled above — don't scan the frames twice.
+        file = await cutSplit(video, moments[i], i, workDir, resolution, caption, log, words, background, subjectX);
       } else {
         file = await cutClip(video, moments[i], i, workDir, resolution, caption, log, words, motion, layout, subjectX);
       }

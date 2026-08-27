@@ -54,6 +54,63 @@ export function addReels(userId, clips, sourceUrl) {
   persist();
 }
 
+// ---------- retention ----------
+// Clips are big — a single run can leave a few hundred MB behind, and nothing
+// was ever deleting them. Left alone this fills the disk and takes the site
+// down, so old clips are swept on a schedule and their library rows go with
+// them (a row pointing at a missing file is worse than no row).
+const RETENTION_DAYS = Number(process.env.CLIP_RETENTION_DAYS || 30);
+export const retentionDays = () => RETENTION_DAYS;
+
+export async function sweepOldClips() {
+  if (!(RETENTION_DAYS > 0)) return { removed: 0, freed: 0 };
+  const cutoff = Date.now() - RETENTION_DAYS * 86400_000;
+  let removed = 0, freed = 0;
+
+  // 1. Drop expired rows, freeing their files.
+  for (const [userId, list] of Object.entries(library)) {
+    const keep = [];
+    for (const reel of list) {
+      if (reel.createdAt && reel.createdAt < cutoff) {
+        freed += await deleteClipFile(reel.url);
+        removed++;
+      } else keep.push(reel);
+    }
+    library[userId] = keep;
+  }
+  if (removed) persist();
+
+  // 2. Sweep job folders nothing references — failed runs, deleted accounts,
+  //    anything orphaned by a crash between rendering and saving.
+  const referenced = new Set(
+    Object.values(library).flat().map((r) => path.dirname(resolveClip(r.url) || "")).filter(Boolean)
+  );
+  const dirs = await fs.readdir(CLIPS_DIR, { withFileTypes: true }).catch(() => []);
+  for (const d of dirs) {
+    if (!d.isDirectory()) continue;
+    const dir = path.join(CLIPS_DIR, d.name);
+    if (referenced.has(dir)) continue;
+    const stat = await fs.stat(dir).catch(() => null);
+    if (!stat || stat.mtimeMs > cutoff) continue;   // young orphans may still be in flight
+    for (const f of await fs.readdir(dir).catch(() => [])) {
+      const st = await fs.stat(path.join(dir, f)).catch(() => null);
+      if (st) freed += st.size;
+    }
+    await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    removed++;
+  }
+  return { removed, freed };
+}
+
+export function startRetentionSweep(log = () => {}) {
+  const run = () => sweepOldClips().then(({ removed, freed }) => {
+    if (removed) log(`Cleaned up ${removed} expired clip${removed === 1 ? "" : "s"} (${(freed / 1e6).toFixed(0)} MB freed).`);
+  }).catch(() => {});
+  const t = setInterval(run, 6 * 60 * 60 * 1000);
+  t.unref?.();
+  setTimeout(run, 10_000).unref?.();
+}
+
 export const reelsRouter = Router();
 
 reelsRouter.get("/reels", (req, res) => {

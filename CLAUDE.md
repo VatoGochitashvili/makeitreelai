@@ -27,6 +27,15 @@ npm start                 # http://localhost:3000
 ```
 Requires `ffmpeg` and `yt-dlp` on PATH (macOS: `brew install ffmpeg yt-dlp`).
 
+## Framing (why clips looked over-zoomed)
+A full-bleed 9:16 crop of a 16:9 source keeps only ~32% of the width and
+magnifies 1.78x. That's geometry, not a setting — the only way to zoom out is
+to stop filling the frame edge to edge. Hence three `layout` options:
+- `balanced` (default) — keeps ~48% of the width centred on the speaker, sized
+  to fill ~66% of the frame height, blurred fill above and below. ~1.17x.
+- `crop` — the old full-bleed behaviour. Tightest.
+- `fit` — the whole frame, letterboxed. Smallest subject.
+
 ## Output formats
 `format` in the generate request picks how a clip is rendered:
 - `clip` — the speaker, cropped to 9:16 (default)
@@ -60,11 +69,18 @@ apps, OAuth, and (for TikTok) an audit — start the applications early.
 
 ## Roadmap / good next tasks
 1. **Animated word-by-word captions** — build an `.ass` subtitle file from Whisper word timestamps, burn with ffmpeg. Biggest quality win.
-2. **Face-tracking reframe** — replace the center crop in `cutClip` with active-speaker detection so the crop follows the speaker.
+2. **Face-tracking reframe** — `findSubjectX` is a motion-energy heuristic that
+   picks one crop position per clip. Real active-speaker detection would let the
+   frame follow someone as they move.
 3. **Accounts + Stripe** — login + $19/mo subscription, per-plan clip limits.
 4. **Real platform posting** — replace the simulated publisher in `src/scheduler.js`
    with TikTok/IG/YouTube API calls. This is what makes autopilot actually autopilot.
 5. **Persist jobs** — move the in-memory `jobs` Map to a database.
+6. **Job queue** — concurrent runs all render at once; nothing limits parallel
+   ffmpeg/Whisper work per server.
+
+Clip files are swept after `CLIP_RETENTION_DAYS` (default 30) — see
+`sweepOldClips` in `src/reels.js`.
 
 ## Conventions
 - Keep the pipeline modular (one function per stage) so stages can be swapped.
