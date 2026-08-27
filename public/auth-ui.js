@@ -33,3 +33,14 @@
   clearTimeout(failsafe);
   reveal();
 })();
+
+
+// Mark which of the three home pages you're on. Kept here because every page
+// already loads this file, and it needs to run after the nav exists.
+(function () {
+  const here = document.body.dataset.source;
+  if (!here) return;
+  document.querySelectorAll(".nav-links a[data-nav]").forEach((a) => {
+    a.classList.toggle("on", a.dataset.nav === here && !document.body.classList.contains("studio"));
+  });
+})();

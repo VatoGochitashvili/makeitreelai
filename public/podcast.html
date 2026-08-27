@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MakeItReel — Turn any YouTube video into viral clips</title>
+  <title>Podcast to Reels — MakeItReel</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body data-source="link">
+<body data-source="podcast">
 
 <nav class="site">
   <div class="wrap">
@@ -165,9 +165,9 @@
 </div></div>
   </div>
   <div class="wrap hero-center">
-    <span class="eyebrow"><span class="dot"></span> Built for podcasters &amp; creators</span>
-    <h1>One link.<br><span class="grad">Ten viral reels.</span></h1>
-    <p class="sub">Paste a YouTube link. Our AI finds the best moments and cuts them into ready-to-post vertical clips — with captions, in minutes.</p>
+    <span class="eyebrow"><span class="dot"></span> For podcasters</span>
+    <h1>One episode.<br><span class="grad">A week of posts.</span></h1>
+    <p class="sub">Paste your show's RSS feed and pick an episode. Podcast feeds publish their audio for download, so this source is never blocked.</p>
 
     <div class="tool">
       <!-- shown when logged out -->
@@ -182,10 +182,10 @@
 
         <div id="srcLink">
           <div class="box">
-            <input id="url" type="text" placeholder="Paste a YouTube link…" />
+            <input id="url" type="text" placeholder="Paste a YouTube or podcast link…" />
             <button class="btn" id="go">Make my reels</button>
           </div>
-          <div class="src-note">YouTube sometimes blocks downloads. If a link fails, <a href="/upload.html">upload the file</a> instead — that always works.</div>
+          <div class="src-note">Links can be blocked by the source site. Uploading always works.</div>
         </div>
 
         <div id="srcFile" style="display:none">
@@ -208,7 +208,7 @@
 
         <div id="srcPodcast" style="display:none">
           <div class="box">
-            <input id="feedUrl" type="text" placeholder="Paste your podcast RSS feed URL…" />
+            <input id="feedUrl" type="text" placeholder="Paste your show's RSS feed URL…" />
             <button class="btn" id="feedGo">Load episodes</button>
           </div>
           <div class="src-note">Podcast feeds publish episodes for download — this source is never blocked.</div>
@@ -408,9 +408,9 @@
     </div>
 
     <div class="trust">
-      <span>✨ No editing skills needed</span>
-      <span>⚡ ~2 min per video</span>
-      <span>📅 Auto-post scheduler</span>
+      <span>🎙️ Any podcast host</span>
+      <span>🚫 Never blocked</span>
+      <span>📅 Connect once, clip forever</span>
     </div>
   </div>
 </header>

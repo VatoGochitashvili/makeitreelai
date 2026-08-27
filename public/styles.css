@@ -82,13 +82,31 @@ a { color: inherit; }
 .narrow { max-width: 460px; }
 
 /* ---------- nav ---------- */
+/* The nav used to be a solid slab with a hard edge, which read as a separate
+   thing bolted on top of the page. Now it dissolves: no border, no fill, just a
+   gradient that fades the page out underneath it so content passing behind
+   doesn't collide with the links. */
 nav.site {
   position: sticky;
   top: 0;
   z-index: 50;
-  border-bottom: 1px solid var(--line);
-  background: rgba(6, 9, 18, .72);
-  backdrop-filter: blur(16px);
+  background: none;
+  border-bottom: 0;
+}
+nav.site::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, var(--bg) 0%, rgba(7, 8, 13, .82) 45%, transparent 100%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 55%, transparent 100%);
+}
+nav.site .wrap { position: relative; z-index: 1; }
+/* the page you're on, marked without a heavy pill */
+.nav-links a.on { color: var(--text); }
+.nav-links a.on::after {
+  content: ""; display: block; height: 2px; margin-top: 5px; border-radius: 2px;
+  background: var(--grad);
 }
 nav.site .wrap { display: flex; align-items: center; height: 72px; gap: 20px; }
 .logo {
@@ -838,10 +856,25 @@ footer.site nav a:hover { color: var(--text); }
 
 /* ---------- centred hero over a wall of drifting reels ---------- */
 .hero { position: relative; padding: 120px 0 96px; overflow: hidden; min-height: 620px; }
+/* Each home page is one job, so the hero owns the screen and the input sits at
+   eye level instead of below the fold. min-height rather than height: once a
+   preview, settings and clips appear the page simply grows. */
+.hero.hero-full {
+  min-height: 100svh; display: flex; align-items: center;
+  padding: 0 0 60px; position: relative;
+}
+.hero.hero-full .hero-center { padding-top: 72px; }
 .hero .hero-center {
   position: relative; z-index: 2; text-align: center;
   max-width: 760px; display: flex; flex-direction: column; align-items: center;
+  margin-inline: auto;
 }
+/* the tool is the hero's centrepiece now, not a section further down */
+.hero .hero-center .tool {
+  width: 100%; max-width: 620px; margin: 30px auto 0; text-align: left;
+}
+.hero .hero-center .tool .box { margin: 0; }
+.hero .hero-center .trust { margin-top: 26px; }
 .hero .hero-center h1 { font-size: clamp(40px, 6vw, 68px); margin: 22px 0 18px; }
 .hero .hero-center p.sub { max-width: 560px; margin: 0 auto; }
 .hero .hero-center .hero-bar { margin: 32px auto 0; width: 100%; max-width: 580px; }

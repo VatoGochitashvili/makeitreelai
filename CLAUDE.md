@@ -14,8 +14,13 @@ Business model: monthly subscription (~$19/mo). Planned differentiator vs Opus: 
 ## Layout
 - `server.js` — Express server; routes `POST /api/clip` (start job) and `GET /api/jobs/:id` (poll status/logs/clips). In-memory job store.
 - `src/pipeline.js` — the pipeline: `makeClips(url, log)` → download → transcribe → selectMoments (GPT) → cutClip (ffmpeg). Returns clip files + metadata.
-- `public/index.html` — the marketing home + the tool (logged-out visitors can preview).
-- `public/studio.html` — the signed-in workspace; same tool, no pitch.
+- `public/index.html`, `public/podcast.html`, `public/upload.html` — three
+  single-purpose home pages (YouTube link / RSS feed / file upload). Same
+  markup; `<body data-source>` picks which input shows.
+- `public/studio.html` — the signed-in workspace: all three sources behind
+  tabs, plus the plan strip and autopilot (`data-plan-meta="on"`).
+- `public/tool.js` — the tool, shared by all four. Was duplicated inline in
+  every page; don't copy it back.
 - `src/backgrounds.js` — gameplay footage library for the split/brainrot formats.
 - `.env` — needs `OPENAI_API_KEY` (copy from `.env.example`).
 
