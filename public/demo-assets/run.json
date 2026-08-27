@@ -1,0 +1,23 @@
+{
+  "generatedAt": "2026-08-27T22:07:20.957Z",
+  "moments": [
+    {
+      "title": "The Real Problem with Recording",
+      "hook": "The problem was never the recording.",
+      "virality": 75,
+      "start": 7.6,
+      "end": 35.4,
+      "seconds": 27.8
+    }
+  ],
+  "aiLog": [
+    "  🤖 Whisper (whisper-1): uploading 0.3 MB…",
+    "  🤖 Whisper done in 3.3s — 10 segments, 120 words, ~$0.004",
+    "  🤖 GPT (gpt-4o-mini): analysing 10 transcript segments…",
+    "  🤖 GPT done in 1.2s — 590 in / 80 out tokens, ~$0.0001",
+    "  🤖 Whisper (whisper-1): uploading 0.3 MB…",
+    "  🤖 Whisper done in 3.5s — 10 segments, 120 words, ~$0.004",
+    "  🤖 GPT (gpt-4o-mini): analysing 10 transcript segments…",
+    "  🤖 GPT done in 1.7s — 590 in / 73 out tokens, ~$0.0001"
+  ]
+}

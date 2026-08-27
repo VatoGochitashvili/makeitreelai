@@ -72,7 +72,24 @@ Still simulated: actual publishing. `src/scheduler.js` flips due posts to
 "posted" without calling TikTok/Instagram/YouTube. Those APIs need registered
 apps, OAuth, and (for TikTok) an audit — start the applications early.
 
-## Features page
+## Features pages
+`public/features.html` is the index; `public/f/<slug>.html` is a page each.
+
+The demo source in `public/demo-assets/` is ours end to end — our script, our
+TTS, a picture drawn with ffmpeg — precisely so the outputs can be published
+without using anyone else's footage. Everything on a Live feature's page came
+out of a real pipeline run against it (`run.json` holds the actual moment picks
+and model calls).
+
+Soon features get a "Not built yet" panel and a schematic labelled as one. Do
+not put a mocked-up artifact on a Soon page: the badge and the panel are the
+only things standing between the marketing and a refund request.
+
+To regenerate the assets, run the pipeline against `demo-assets/source.mp4`
+with `layout: balanced` and `layout: crop` (the Smart Frame pair), plus
+`format: split` and `format: brainrot`.
+
+## Features page (menu + grid)
 `public/features.html` lists all sixteen, each with a CSS-only animated demo of
 the mechanism (`public/demos.css`). No JS, so a demo can't fail to start, and
 they all stop under `prefers-reduced-motion`. The nav's Features menu links

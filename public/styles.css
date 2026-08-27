@@ -1174,3 +1174,82 @@ body.studio .tool { max-width: 100%; }
   .fp-row { grid-template-columns: 1fr; gap: 18px; }
   .fp-demo { max-width: 340px; }
 }
+
+/* ---------- one feature, one page ---------- */
+.pf-main { padding: 34px 24px 90px; max-width: 820px; }
+.pf-back { color: var(--muted); font-size: 14px; text-decoration: none; }
+.pf-back:hover { color: var(--text); }
+
+.pf-head { margin: 26px 0 30px; }
+.pf-ic {
+  display: inline-grid; place-items: center; width: 46px; height: 46px;
+  border-radius: 13px; font-size: 20px; color: #fff; margin-bottom: 16px;
+  background: linear-gradient(140deg, rgba(139, 92, 246, .4), rgba(236, 72, 153, .28));
+  border: 1px solid rgba(255, 255, 255, .1);
+}
+.pf-head h1 { font-size: clamp(30px, 4.2vw, 44px); letter-spacing: -.03em; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pf-tag { color: var(--muted); font-size: 18px; margin-top: 10px; max-width: 60ch; line-height: 1.55; }
+
+.pf-body p { color: var(--muted); font-size: 16px; line-height: 1.72; margin-bottom: 16px; max-width: 68ch; }
+.pf-block { margin-top: 42px; }
+.pf-block h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .11em; color: var(--muted); font-weight: 700; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+
+/* real output */
+.ev-media { margin: 0 0 18px; }
+.ev-media video { width: 100%; max-width: 300px; border-radius: 14px; display: block; background: #000; border: 1px solid var(--line); }
+.ev-media figcaption { color: var(--muted); font-size: 13px; margin-top: 10px; max-width: 300px; line-height: 1.5; }
+.ev-pair { display: flex; gap: 24px; flex-wrap: wrap; }
+.ev-pair .ev-media { flex: 1 1 250px; }
+
+.ev-data { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.ev-row { display: flex; justify-content: space-between; gap: 18px; padding: 12px 16px; font-size: 14px; }
+.ev-row + .ev-row { border-top: 1px solid var(--line); }
+.ev-row span { color: var(--muted); }
+.ev-row b { color: var(--text); font-weight: 600; text-align: right; }
+
+.ev-code {
+  background: rgba(0, 0, 0, .4); border: 1px solid var(--line); border-radius: 10px;
+  padding: 14px 16px; font-size: 12px; line-height: 1.75; color: #b9c0d4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-x: auto; margin-top: 18px;
+}
+.ev-quote {
+  border-left: 2px solid var(--c2); padding: 4px 0 4px 18px; margin: 18px 0 0;
+  color: var(--text); font-size: 15.5px; line-height: 1.7; max-width: 62ch;
+}
+.ev-note { color: var(--muted); font-size: 13px; margin-top: 12px; line-height: 1.55; }
+.ev-note code { font-family: ui-monospace, monospace; font-size: 12px; color: #b9c0d4; }
+.ev-warn {
+  margin-top: 20px; padding: 14px 16px; border-radius: 10px; font-size: 13.5px; line-height: 1.6;
+  color: #f5d59a; background: rgba(245, 213, 154, .07); border: 1px solid rgba(245, 213, 154, .22);
+}
+.ev-warn b { color: #ffe4b0; }
+
+.ev-log { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.ev-line { display: flex; gap: 14px; padding: 11px 16px; font-size: 13.5px; color: var(--muted); }
+.ev-line + .ev-line { border-top: 1px solid var(--line); }
+.ev-line span { min-width: 58px; opacity: .6; font-size: 12px; }
+.ev-line.ok { color: #6ee7a8; }
+
+/* not built yet */
+.pf-soon {
+  padding: 16px 18px; border-radius: 12px; font-size: 14.5px; line-height: 1.65;
+  color: var(--muted); background: rgba(255, 255, 255, .03); border: 1px solid var(--line);
+}
+.pf-soon b { color: var(--text); }
+.pf-schematic { position: relative; max-width: 380px; margin-top: 20px; }
+.pf-schematic-tag {
+  position: absolute; top: 10px; right: 10px; font-size: 9.5px; font-weight: 800;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+  background: rgba(0, 0, 0, .55); border: 1px solid rgba(255, 255, 255, .12);
+  padding: 3px 7px; border-radius: 5px;
+}
+
+.pf-steps { color: var(--muted); font-size: 15px; line-height: 1.7; padding-left: 20px; max-width: 62ch; }
+.pf-steps li { margin-bottom: 9px; }
+.pf-cta { margin-top: 46px; }
+.pf-nav { display: flex; justify-content: space-between; gap: 16px; margin-top: 46px; padding-top: 22px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.pf-next { color: var(--muted); font-size: 14px; text-decoration: none; }
+.pf-next:hover { color: var(--text); }
+.fp-more { display: inline-block; margin-top: 12px; font-size: 14px; color: var(--c2); text-decoration: none; font-weight: 600; }
+.fp-more:hover { text-decoration: underline; }

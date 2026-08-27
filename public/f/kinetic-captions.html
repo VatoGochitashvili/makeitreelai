@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kinetic Captions — MakeItReel</title>
+  <meta name="description" content="Word-by-word captions timed to the speech and burned in.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/demos.css">
+</head>
+<body data-source="link">
+
+<nav class="site">
+  <div class="wrap">
+    <a class="logo" href="/">
+      <span class="dot"></span><span class="wm">makeit<span class="wm-reel">reel</span></span>
+    </a>
+
+    <!-- Primary: the three ways in, plus Features. Never dropped — Features
+         used to live in the marketing group and vanished on any window under
+         1300px, which is most laptops. -->
+    <div class="nav-links nav-group">
+      <a href="/" data-nav="link">YouTube</a>
+      <a href="/podcast.html" data-nav="podcast">Podcast</a>
+      <a href="/upload.html" data-nav="file">Upload</a>
+      <span class="has-menu" id="featTrigger">
+        <a href="/features.html" class="feat-trigger">Features <span class="caret">▾</span></a>
+        <div class="feat-menu" id="featMenu">
+          <div class="fm-grid">
+            <div class="fm-col"><div class="fm-head">Create</div><a class="fm-item" href="/f/moment-finder.html"><span class="fm-ic">◎</span><span class="fm-txt"><span class="fm-name">Moment Finder<span class="fb live">Live</span></span><span class="fm-blurb">Finds the clip-worthy moments in any long video and ranks them.</span></span></a><a class="fm-item" href="/f/gameplay-shorts.html"><span class="fm-ic">▶</span><span class="fm-txt"><span class="fm-name">Gameplay Shorts<span class="fb live">Live</span></span><span class="fm-blurb">Your clip over Minecraft or Fortnite footage — or an AI voice reading it, source never shown.</span></span></a><a class="fm-item" href="/f/director.html"><span class="fm-ic">✦</span><span class="fm-txt"><span class="fm-name">Director<span class="fb soon">Soon</span></span><span class="fm-blurb">Raw footage in, a finished post out. No decisions to make.</span></span></a><a class="fm-item" href="/f/cover-art.html"><span class="fm-ic">▣</span><span class="fm-txt"><span class="fm-name">Cover Art<span class="fb soon">Soon</span></span><span class="fm-blurb">Drop a link, get a thumbnail worth clicking.</span></span></a></div>
+            <div class="fm-col"><div class="fm-head">Polish</div><a class="fm-item" href="/f/kinetic-captions.html"><span class="fm-ic">⌁</span><span class="fm-txt"><span class="fm-name">Kinetic Captions<span class="fb live">Live</span></span><span class="fm-blurb">Word-by-word captions timed to the speech and burned in.</span></span></a><a class="fm-item" href="/f/smart-frame.html"><span class="fm-ic">⊞</span><span class="fm-txt"><span class="fm-name">Smart Frame<span class="fb live">Live</span></span><span class="fm-blurb">Keeps the speaker in frame at a sane zoom, not shoved in your face.</span></span></a><a class="fm-item" href="/f/voice-over.html"><span class="fm-ic">◍</span><span class="fm-txt"><span class="fm-name">Voice Over<span class="fb live">Live</span></span><span class="fm-blurb">Six AI voices that read a hook, or narrate the whole thing.</span></span></a><a class="fm-item" href="/f/brand-kit.html"><span class="fm-ic">◈</span><span class="fm-txt"><span class="fm-name">Brand Kit<span class="fb soon">Soon</span></span><span class="fm-blurb">Your fonts, colours and logo on every clip, set once.</span></span></a><a class="fm-item" href="/f/cutaways.html"><span class="fm-ic">⧉</span><span class="fm-txt"><span class="fm-name">Cutaways<span class="fb soon">Soon</span></span><span class="fm-blurb">Relevant B-roll dropped in where the talking gets long.</span></span></a><a class="fm-item" href="/f/edit-room.html"><span class="fm-ic">✂</span><span class="fm-txt"><span class="fm-name">Edit Room<span class="fb soon">Soon</span></span><span class="fm-blurb">Nudge a cut, retime a caption, swap a take — no timeline skills needed.</span></span></a></div>
+            <div class="fm-col"><div class="fm-head">Publish</div><a class="fm-item" href="/f/autopilot.html"><span class="fm-ic">∞</span><span class="fm-txt"><span class="fm-name">Autopilot<span class="fb live">Live</span></span><span class="fm-blurb">Connect your podcast feed once. New episodes clip and queue themselves.</span></span></a><a class="fm-item" href="/f/crew.html"><span class="fm-ic">◇</span><span class="fm-txt"><span class="fm-name">Crew<span class="fb soon">Soon</span></span><span class="fm-blurb">Shared libraries and seats, so a team isn't passing files around.</span></span></a><a class="fm-item" href="/f/timeline-export.html"><span class="fm-ic">⇱</span><span class="fm-txt"><span class="fm-name">Timeline Export<span class="fb soon">Soon</span></span><span class="fm-blurb">Hand the cut to Premiere or Resolve when you want the last word.</span></span></a></div>
+            <div class="fm-col"><div class="fm-head">Build on it</div><a class="fm-item" href="/f/reel-api.html"><span class="fm-ic">⌘</span><span class="fm-txt"><span class="fm-name">Reel API<span class="fb soon">Soon</span></span><span class="fm-blurb">The whole pipeline behind one endpoint.</span></span></a><a class="fm-item" href="/f/agent-bridge.html"><span class="fm-ic">⇄</span><span class="fm-txt"><span class="fm-name">Agent Bridge<span class="fb soon">Soon</span></span><span class="fm-blurb">An MCP server, so an agent can make clips without a browser.</span></span></a><a class="fm-item" href="/f/showcase.html"><span class="fm-ic">◐</span><span class="fm-txt"><span class="fm-name">Showcase<span class="fb soon">Soon</span></span><span class="fm-blurb">Real runs, real outputs — see what comes out before you sign up.</span></span></a></div>
+          </div>
+        </div>
+      </span>
+    </div>
+
+    <span class="nav-sep"></span>
+
+    <!-- Secondary: dropped first when the bar runs short. -->
+    <div class="nav-links nav-group nav-marketing">
+      <a href="/#how">How it works</a>
+      <a href="/#pricing">Pricing</a>
+      <a href="/#faq">FAQ</a>
+    </div>
+
+    <div class="nav-right" id="navRight">
+      <!-- filled by auth-ui.js: either Login/Sign up, or account pill -->
+      <a class="btn ghost" href="/login.html">Log in</a>
+      <a class="btn" href="/register.html">Sign up free</a>
+    </div>
+  </div>
+</nav>
+
+<main class="wrap pf-main">
+  <a class="pf-back" href="/features.html">← All features</a>
+
+  <header class="pf-head">
+    <span class="pf-ic">⌁</span>
+    <h1>Kinetic Captions<span class="fb live">Live</span></h1>
+    <p class="pf-tag">Word-by-word captions timed to the speech and burned in.</p>
+  </header>
+
+  <article class="pf-body">
+      <p>Captions that appear a word at a time are what stop a scroll. Doing it properly needs to know when each word is spoken, not just what was said.</p>
+      <p>Whisper is asked for word-level timestamps, which cost nothing extra on the same call. Those become an .ass subtitle file — two or three words at a time, each held at least half a second so nothing flickers — and libass burns it into the frame.</p>
+  </article>
+
+    <section class="pf-block">
+      <h2>What it actually produces</h2>
+<figure class="ev-media"><video src="/demo-assets/clip-balanced.mp4" poster="/demo-assets/clip-balanced.jpg" controls loop muted playsinline preload="metadata"></video><figcaption>A real clip from the pipeline. Captions burned in, timed to the words.</figcaption></figure><pre class="ev-code">Dialogue: 0,0:00:01.28,0:00:01.94,W,,0,0,0,,{\fad(60,60)}THE PROBLEM
+Dialogue: 0,0:00:01.94,0:00:02.61,W,,0,0,0,,{\fad(60,60)}WAS NEVER
+Dialogue: 0,0:00:02.61,0:00:03.402,W,,0,0,0,,{\fad(60,60)}THE RECORDING</pre>
+<p class="ev-note">The shape of the subtitle file the run actually wrote.</p>
+    </section>
+
+    <section class="pf-block">
+      <h2>How it works</h2>
+      <ol class="pf-steps">
+        <li>Ask Whisper for word timestamps</li>
+        <li>Group into 2–3 word phrases, minimum 0.5s each</li>
+        <li>Write an .ass file with the chosen style and position</li>
+        <li>Burn it in with libass</li>
+      </ol>
+    </section>
+
+  <div class="pf-cta">
+    <a class="btn lg" href="/">Try it now →</a>
+  </div>
+
+  <nav class="pf-nav"><a class="pf-next" href="/f/cover-art.html">← Cover Art</a><a class="pf-next" href="/f/smart-frame.html">Smart Frame →</a></nav>
+</main>
+
+<script src="/bg.js"></script>
+<script src="/nav.js"></script>
+<script src="/auth-ui.js"></script>
+</body>
+</html>
