@@ -172,7 +172,9 @@ async function mineTheme(userId, query) {
 Find the 6 strongest moments about: "${query}"
 
 Each must be a complete thought that stands alone — 20 to 75 seconds, starting at
-a sentence start and ending after the point lands. Pick from DIFFERENT episodes
+a sentence start and ending after the point lands. Never start on throat-clearing
+("yeah", "so", "well", "I'm not an expert but") — the first line has to work as a
+hook on its own. Pick from DIFFERENT episodes
 where you can; the value here is showing the best answers across the whole show,
 not six from one episode.
 
@@ -202,13 +204,39 @@ ${corpus}` }],
     if (j < 0) j = seg.length - 1; else j = Math.max(i, j - 1);
 
     const ends = (n) => /[.!?]["')\]]?\s*$/.test((seg[n]?.t || "").trim());
+    // A clip that opens "Yeah, so, I'm not an expert but…" is a wasted clip.
+    // These are the openers that read as someone clearing their throat.
+    const filler = (n) => /^\s*(yeah|yes|no|right|ok|okay|so|and|but|well|um|uh|i mean|you know|objectively|absolutely|exactly|sure|hmm|look|listen)\b/i
+      .test((seg[n]?.t || "").trim())
+      || /^\s*i'?m not (a|an) \w+ (expert|specialist)/i.test((seg[n]?.t || "").trim());
+
+    // The model sometimes hands back a four-minute span. Expansion only ever
+    // grows a pick, so without this those sailed through at 228 seconds — which
+    // is not a short. Pull the end back to the last sentence that fits.
+    if (seg[j] && seg[i] && seg[j].e - seg[i].s > MAX) {
+      let k = i;
+      while (k + 1 <= j && seg[k + 1].e - seg[i].s <= MAX) k++;
+      let sentence = k;
+      while (sentence > i && !ends(sentence)) sentence--;
+      j = sentence > i ? sentence : k;
+    }
+
     // grow backwards to the start of the sentence, then forwards until the
     // thought finishes and the clip is long enough to make sense alone
     while (i > 0 && !ends(i - 1)) i--;
+    // If that landed on throat-clearing, step to the next real sentence — as
+    // long as there is still enough clip left after it to be worth having.
+    let guard = 0;
+    while (filler(i) && i < j && guard++ < 4) {
+      let n = i + 1;
+      while (n < j && !ends(n - 1)) n++;
+      if (n >= j || seg[j].e - seg[n].s < MIN) break;
+      i = n;
+    }
     while (seg[j] && (seg[j].e - seg[i].s < MIN || !ends(j)) && j < seg.length - 1
            && seg[j + 1].e - seg[i].s <= MAX) j++;
     while (i > 0 && seg[j].e - seg[i - 1].s <= MAX && seg[j].e - seg[i].s < MIN) i--;
-    return { start: seg[i].s, end: seg[j].e };
+    return { start: seg[i].s, end: Math.min(seg[j].e, seg[i].s + MAX) };
   }
   const moments = picked.map((p) => {
     const ep = scored[p.episode]?.e;
