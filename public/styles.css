@@ -46,6 +46,7 @@
 #bgfx {
   position: fixed; inset: 0; z-index: 0; pointer-events: none;
   opacity: .85;
+  max-width: 100vw;   /* belt and braces: never let the canvas cause scroll */
 }
 /* Lift page content above the ambient canvas. The `:not(#bgfx)` form carried
    ID-level specificity, which quietly beat `nav.site { z-index: 50 }` and
@@ -143,11 +144,31 @@ nav.site .nav-right { margin-left: auto; }
    swapping it a moment later reads as being signed out unexpectedly. */
 .nav-right.resolving > * { opacity: 0; pointer-events: none; }
 .nav-right > * { transition: opacity var(--t); }
-/* The bar is taller and busier than it was; signed in it also carries Studio,
-   My Reels, a plan pill and Log out. Drop the marketing links before they
-   push the account buttons off the right edge. */
-@media (max-width: 1300px) { .nav-marketing, .nav-sep { display: none; } }
-@media (max-width: 780px) { .nav-links { display: none; } }
+/* Tighten before hiding: losing links is the last resort, not the first. */
+@media (max-width: 1280px) {
+  nav.site .wrap { gap: 14px; }
+  .nav-links { gap: 15px; margin-left: 8px; }
+  .nav-marketing a { font-size: 13.5px; }
+}
+/* Only the secondary links ever go, and only once nothing else will fit.
+   Features stays in the primary group so it is always reachable. */
+@media (max-width: 1120px) { .nav-marketing, .nav-sep { display: none; } }
+@media (max-width: 780px) {
+  .nav-links > a { display: none; }          /* the tool links live in the hero anyway */
+  .has-menu { display: inline-flex; }        /* but keep a way into Features */
+  .feat-menu { position: fixed; left: 12px; right: 12px; width: auto; transform: none; max-height: 74vh; overflow-y: auto; }
+  .has-menu.open .feat-menu { transform: none; }
+  /* Signed in, the right side carries four controls and overflowed the phone
+     by ~330px. Keep the two that go somewhere; the rest live on the account
+     page the avatar already links to. */
+  .nav-right .btn.ghost[href="/my-reels.html"],
+  .nav-right .plan-tag,
+  .nav-right #logoutBtn { display: none; }
+  nav.site .wrap { gap: 10px; padding: 0 12px; height: 68px; }
+  .logo { font-size: 21px; }
+  .nav-right { gap: 8px; }
+  .nav-right .avatar { width: 30px; height: 30px; font-size: 12px; }
+}
 
 /* ---------- buttons ---------- */
 .btn {
@@ -1051,7 +1072,7 @@ body.studio .tool { max-width: 100%; }
 
 
 /* ---------- features mega-menu ---------- */
-.has-menu { position: relative; }
+.has-menu { position: relative; display: inline-flex; align-items: center; }
 .feat-trigger { display: inline-flex; align-items: center; gap: 5px; }
 .caret { font-size: 9px; opacity: .7; transition: transform var(--t); }
 .has-menu.open .caret { transform: rotate(180deg); }

@@ -12,12 +12,17 @@
   let w, h, dots, dpr;
   function size() {
     dpr = Math.min(window.devicePixelRatio || 1, 2);
-    w = c.width = innerWidth * dpr;
-    h = c.height = innerHeight * dpr;
-    c.style.width = innerWidth + "px";
-    c.style.height = innerHeight + "px";
+    // Measure the element, not the window. Writing innerWidth back as a CSS
+    // width could make the canvas wider than the layout — which adds a
+    // horizontal scrollbar, which grows innerWidth, which widens it again.
+    // `inset: 0` already sizes it; we only set the backing store.
+    const box = c.getBoundingClientRect();
+    const cssW = Math.max(1, Math.round(box.width));
+    const cssH = Math.max(1, Math.round(box.height));
+    w = c.width = cssW * dpr;
+    h = c.height = cssH * dpr;
     // density scales with the viewport, capped so it stays minimal
-    const n = Math.min(46, Math.round((innerWidth * innerHeight) / 42000));
+    const n = Math.min(46, Math.round((cssW * cssH) / 42000));
     dots = Array.from({ length: n }, () => ({
       x: Math.random() * w,
       y: Math.random() * h,

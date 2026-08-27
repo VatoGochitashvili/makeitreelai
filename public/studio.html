@@ -16,14 +16,15 @@
     <a class="logo" href="/">
       <span class="dot"></span><span class="wm">makeit<span class="wm-reel">reel</span></span>
     </a>
+
+    <!-- Primary: the three ways in, plus Features. Never dropped — Features
+         used to live in the marketing group and vanished on any window under
+         1300px, which is most laptops. -->
     <div class="nav-links nav-group">
       <a href="/" data-nav="link">YouTube</a>
       <a href="/podcast.html" data-nav="podcast">Podcast</a>
       <a href="/upload.html" data-nav="file">Upload</a>
-    </div>
-    <span class="nav-sep"></span>
-    <div class="nav-links nav-group nav-marketing">
-      <div class="has-menu" id="featTrigger">
+      <span class="has-menu" id="featTrigger">
         <a href="/features.html" class="feat-trigger">Features <span class="caret">▾</span></a>
         <div class="feat-menu" id="featMenu">
           <div class="fm-grid">
@@ -33,11 +34,18 @@
             <div class="fm-col"><div class="fm-head">Build on it</div><a class="fm-item" href="/features.html#reel-api"><span class="fm-ic">⌘</span><span class="fm-txt"><span class="fm-name">Reel API<span class="fb soon">Soon</span></span><span class="fm-blurb">The whole pipeline behind one endpoint.</span></span></a><a class="fm-item" href="/features.html#agent-bridge"><span class="fm-ic">⇄</span><span class="fm-txt"><span class="fm-name">Agent Bridge<span class="fb soon">Soon</span></span><span class="fm-blurb">An MCP server, so an agent can make clips without a browser.</span></span></a><a class="fm-item" href="/features.html#showcase"><span class="fm-ic">◐</span><span class="fm-txt"><span class="fm-name">Showcase<span class="fb soon">Soon</span></span><span class="fm-blurb">Real runs, real outputs — see what comes out before you sign up.</span></span></a></div>
           </div>
         </div>
-      </div>
+      </span>
+    </div>
+
+    <span class="nav-sep"></span>
+
+    <!-- Secondary: dropped first when the bar runs short. -->
+    <div class="nav-links nav-group nav-marketing">
       <a href="/#how">How it works</a>
       <a href="/#pricing">Pricing</a>
       <a href="/#faq">FAQ</a>
     </div>
+
     <div class="nav-right" id="navRight">
       <!-- filled by auth-ui.js: either Login/Sign up, or account pill -->
       <a class="btn ghost" href="/login.html">Log in</a>
