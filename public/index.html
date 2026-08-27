@@ -189,11 +189,6 @@
 <!-- ============ TRY IT (the actual tool) ============ -->
 <section class="block" id="try" style="padding-top:30px">
   <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">Live demo</span>
-      <h2>Try it with your own link</h2>
-      <p>Paste a video you own. First runs take a couple of minutes while we download, transcribe, and cut.</p>
-    </div>
     <div class="tool">
       <!-- shown when logged out -->
       <div class="signin-note" id="loginGate" style="display:none">
@@ -599,9 +594,11 @@ async function initTool() {
   const signedIn = !!(ME && ME.user);
   loginGate.style.display = signedIn ? "none" : "flex";
   toolMain.style.display = "block";
-  toolMeta.style.display = signedIn ? "" : "none";
+  // Plan details ("Pro plan · 10 clips / video · 1080p") are workspace
+  // furniture — they belong in the Studio, not on the marketing page.
+  toolMeta.style.display = "none";
   go.textContent = signedIn ? "Make my reels" : "Make my reels →";
-  if (signedIn) renderMeta();
+
 
   // If the visitor arrived via the hero bar (or finished signup), restore
   // the link and any settings they had chosen before signing up.
