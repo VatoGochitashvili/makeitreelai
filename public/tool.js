@@ -10,7 +10,36 @@
 
 
 /* ---------- the generator tool ---------- */
-const $ = (id) => document.getElementById(id);
+// The home pages ship without the settings panel — one link, one button, and
+// the defaults do the rest. Rather than guard forty call sites against a null,
+// hand out a detached stand-in carrying the value that control would have had:
+// reads get sensible defaults, writes and listeners go nowhere visible.
+const SETTINGS_STANDINS = {
+  settings: ["details", ""], setClips: ["select", "5"], setLength: ["select", "auto"],
+  setCapStyle: ["select", "bold"], setCapPos: ["select", "top"], setCapSize: ["select", "medium"],
+  setLayout: ["select", "balanced"], setMotion: ["select", "subtle"], setFormat: ["select", "clip"],
+  setBackground: ["select", ""], setSum: ["span", ""], capPreview: ["div", ""], capSample: ["span", ""],
+  bgPicker: ["div", ""], bgAdd: ["button", ""], bgFile: ["input", ""], bgNote: ["div", ""],
+  voToggle: ["input", ""], voVoice: ["select", "alloy"], voLock: ["a", ""], voSwitch: ["label", ""],
+  voSample: ["button", ""], voSampleTxt: ["span", ""], goBottom: ["button", ""],
+};
+const standins = new Map();
+const $ = (id) => {
+  const el = document.getElementById(id);
+  if (el) return el;
+  const spec = SETTINGS_STANDINS[id];
+  if (!spec) return null;
+  if (!standins.has(id)) {
+    const node = document.createElement(spec[0]);
+    if (spec[1]) {
+      // a <select> only reports a value it actually holds
+      if (spec[0] === "select") node.add(new Option(spec[1], spec[1]));
+      node.value = spec[1];
+    }
+    standins.set(id, node);
+  }
+  return standins.get(id);
+};
 const go = $("go"), urlInput = $("url"), panel = $("panel"), logEl = $("log"),
       statusText = $("statusText"), spin = $("spin"), clipsEl = $("clips"),
       loginGate = $("loginGate"), toolMain = $("toolMain"), toolMeta = $("toolMeta"),

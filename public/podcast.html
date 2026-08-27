@@ -17,11 +17,17 @@
     <a class="logo" href="/">
       <span class="dot"></span><span class="wm">makeit<span class="wm-reel">reel</span></span>
     </a>
-    <div class="nav-links">
+    <div class="nav-links nav-group">
       <a href="/" data-nav="link">YouTube</a>
       <a href="/podcast.html" data-nav="podcast">Podcast</a>
       <a href="/upload.html" data-nav="file">Upload</a>
+    </div>
+    <span class="nav-sep"></span>
+    <div class="nav-links nav-group nav-marketing">
+      <a href="/#how">How it works</a>
+      <a href="/#features">Features</a>
       <a href="/#pricing">Pricing</a>
+      <a href="/#faq">FAQ</a>
     </div>
     <div class="nav-right" id="navRight">
       <!-- filled by auth-ui.js: either Login/Sign up, or account pill -->
@@ -172,7 +178,7 @@
     <div class="tool">
       <!-- shown when logged out -->
       <div class="signin-note" id="loginGate" style="display:none">
-        <span>👋 <strong>Preview any video free.</strong> Sign up when you're ready to generate clips.</span>
+        <span><strong>Preview any video free.</strong> Sign up when you're ready to generate clips.</span>
         <span class="sn-links"><a href="/login.html">Log in</a></span>
       </div>
 
@@ -191,7 +197,7 @@
         <div id="srcFile" style="display:none">
           <div class="drop" id="dropZone">
             <input type="file" id="fileInput" accept="video/*,audio/*" hidden>
-            <div class="drop-ic">⬆️</div>
+            <div class="drop-ic"></div>
             <div class="drop-title">Drop your video here, or <span class="drop-browse">browse</span></div>
             <div class="drop-sub" id="dropLimit">mp4, mov, webm, mkv, mp3, wav</div>
           </div>
@@ -258,118 +264,10 @@
         </div>
 
         <!-- pre-generation settings -->
-        <details class="settings" id="settings">
-          <summary><span>⚙️ Generation settings</span><span class="set-sum" id="setSum"></span></summary>
-          <div class="set-grid">
-            <div class="set-field">
-              <label for="setClips">Number of clips</label>
-              <select id="setClips" class="voice-select"></select>
-            </div>
-            <div class="set-field">
-              <label for="setFormat">Video format</label>
-              <select id="setFormat" class="voice-select">
-                <option value="clip" selected>Standard clip</option>
-                <option value="split">Split screen — clip over gameplay</option>
-                <option value="brainrot">Brainrot — gameplay + AI voice</option>
-              </select>
-            </div>
-            <div class="set-field">
-              <label for="setLength">Clip length</label>
-              <select id="setLength" class="voice-select">
-                <option value="auto">Auto — varied (20s–2min)</option>
-                <option value="short">Short (15–30s)</option>
-                <option value="medium">Medium (30–45s)</option>
-                <option value="long">Long (45–60s)</option>
-              </select>
-            </div>
-            <div class="set-field">
-              <label for="setCapStyle">Caption style</label>
-              <select id="setCapStyle" class="voice-select">
-                <option value="bold">Bold Impact</option>
-                <option value="highlight">Lime Highlight</option>
-                <option value="minimal">Clean Minimal</option>
-                <option value="none">No captions</option>
-              </select>
-            </div>
-            <div class="set-field">
-              <label for="setCapPos">Caption position</label>
-              <select id="setCapPos" class="voice-select">
-                <option value="top">Top</option>
-                <option value="center">Center</option>
-                <option value="bottom">Bottom</option>
-              </select>
-            </div>
-            <div class="set-field">
-              <label for="setLayout">Framing</label>
-              <select id="setLayout" class="voice-select">
-                <option value="balanced" selected>Balanced — speaker with room (recommended)</option>
-                <option value="crop">Tight — fills the frame, cuts the sides</option>
-                <option value="fit">Wide — nothing cropped at all</option>
-              </select>
-            </div>
-            <div class="set-field">
-              <label for="setMotion">Camera motion</label>
-              <select id="setMotion" class="voice-select">
-                <option value="subtle" selected>Smooth zoom (recommended)</option>
-                <option value="strong">Strong zoom</option>
-                <option value="none">Static</option>
-              </select>
-            </div>
-            <div class="set-field">
-              <label for="setCapSize">Caption size</label>
-              <select id="setCapSize" class="voice-select">
-                <option value="small">Small</option>
-                <option value="medium" selected>Medium</option>
-                <option value="large">Large</option>
-              </select>
-            </div>
-            <div class="set-field">
-              <label>Caption preview</label>
-              <div class="cap-preview" id="capPreview"><span id="capSample">Your clip title</span></div>
-            </div>
-          </div>
 
-
-          <!-- only meaningful for the gameplay-backed formats -->
-          <div class="bg-picker" id="bgPicker" style="display:none">
-            <div class="bg-row">
-              <div class="set-field" style="flex:1">
-                <label for="setBackground">Background footage</label>
-                <select id="setBackground" class="voice-select"></select>
-              </div>
-              <button type="button" class="vo-sample" id="bgAdd">+ Add footage</button>
-              <input type="file" id="bgFile" accept="video/*" hidden>
-            </div>
-            <div class="bg-note" id="bgNote"></div>
-          </div>
-          <div class="set-divider"></div>
-
-          <div class="tool-options">
-            <label class="switch" id="voSwitch">
-              <input type="checkbox" id="voToggle">
-              <span class="track"></span>
-              <span class="switch-label">🔊 AI voiceover — narrated hook intro</span>
-            </label>
-            <select id="voVoice" class="voice-select" title="Narration voice">
-              <option value="alloy">Alloy — neutral</option>
-              <option value="nova">Nova — warm</option>
-              <option value="onyx">Onyx — deep</option>
-              <option value="shimmer">Shimmer — bright</option>
-              <option value="echo">Echo — calm</option>
-              <option value="fable">Fable — storyteller</option>
-            </select>
-            <button type="button" class="vo-sample" id="voSample" title="Hear this voice">
-              <span class="vs-ic"></span><span id="voSampleTxt">Preview voice</span>
-            </button>
-            <a class="vo-lock" id="voLock" href="/account.html" style="display:none">🔒 Creator feature — upgrade</a>
-          </div>
-
-          <!-- the settings list is long; repeat the action at the end of it -->
-          <button class="btn block lg" id="goBottom" style="margin-top:18px">Make my reels →</button>
-        </details>
 
         <div class="tool-hint" id="toolHint" style="display:none"></div>
-        <div class="hint">Only clip videos you own or have rights to. 🔒</div>
+        <div class="hint">Only clip videos you own or have rights to.</div>
         <div class="panel" id="panel">
           <!-- friendly progress: a bar and named steps, not raw tool output -->
           <div id="progWrap">
@@ -408,9 +306,9 @@
     </div>
 
     <div class="trust">
-      <span>🎙️ Any podcast host</span>
-      <span>🚫 Never blocked</span>
-      <span>📅 Connect once, clip forever</span>
+      <span>Any podcast host</span>
+      <span>Never blocked</span>
+      <span>Connect once, clip forever</span>
     </div>
   </div>
 </header>
