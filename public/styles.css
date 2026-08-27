@@ -82,21 +82,18 @@ a { color: inherit; }
 .narrow { max-width: 460px; }
 
 /* ---------- nav ---------- */
-/* A navbar should look like a navbar. Solid enough to read against anything
-   scrolling underneath, with a lit edge instead of a flat grey line. */
+/* Light on its feet, but still its own surface. The trick is heavy blur with
+   a low fill: the page shows through as colour and movement rather than as
+   readable detail, so the bar stays legible without going opaque — and a faint
+   hairline keeps a visible boundary so it never dissolves into the page. */
 nav.site {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgba(8, 9, 15, .88);
-  -webkit-backdrop-filter: blur(18px) saturate(130%);
-  backdrop-filter: blur(18px) saturate(130%);
-  border-bottom: 1px solid rgba(255, 255, 255, .07);
-}
-nav.site::after {
-  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(168, 85, 247, .45), rgba(236, 72, 153, .35), transparent);
-  pointer-events: none;
+  background: rgba(9, 10, 17, .55);
+  -webkit-backdrop-filter: blur(26px) saturate(140%);
+  backdrop-filter: blur(26px) saturate(140%);
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
 }
 nav.site .wrap { display: flex; align-items: center; height: 66px; gap: 18px; }
 
@@ -110,7 +107,7 @@ nav.site .nav-right { margin-left: auto; }
 .nav-links a.on { color: var(--text); }
 .nav-links a.on::after {
   content: ""; display: block; height: 2px; margin-top: 5px; border-radius: 2px;
-  background: var(--grad);
+  background: var(--grad); opacity: .75;
 }
 .logo {
   display: flex; align-items: center; gap: 9px; text-decoration: none;
@@ -127,7 +124,7 @@ nav.site .nav-right { margin-left: auto; }
 .logo .wm-reel { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .logo .logo-mark { display: none; }   /* retired the old play mark */
 .nav-links { display: flex; gap: 20px; margin-left: 14px; }
-.nav-links a { color: var(--muted); text-decoration: none; font-size: 15px; font-weight: 500; transition: color var(--t); }
+.nav-links a { color: var(--muted); text-decoration: none; font-size: 14.5px; font-weight: 500; transition: color var(--t); }
 .nav-links a:hover { color: var(--text); }
 .nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; min-height: 40px; }
 /* Until /api/me answers we don't know who this is — showing "Log in" first and
@@ -881,14 +878,17 @@ footer.site nav a:hover { color: var(--text); }
 .hero.hero-full .hero-center .trust { margin-top: 8px; }
 .hero .hero-center {
   position: relative; z-index: 2; text-align: center;
-  max-width: 680px; display: flex; flex-direction: column; align-items: center;
+  max-width: 940px; display: flex; flex-direction: column; align-items: center;
   margin-inline: auto;
 }
 /* the tool is the hero's centrepiece now, not a section further down */
 .hero .hero-center .tool {
-  width: 100%; max-width: 540px; margin: 26px auto 0; text-align: center;
+  width: 100%; max-width: 760px; margin: 26px auto 0; text-align: center;
 }
-.hero .hero-center .tool .box { margin: 0; }
+/* The paste bar is the whole point of the page, so give it real presence. */
+.hero .hero-center .tool .box { margin: 0; padding: 10px 10px 10px 12px; border-radius: 22px; }
+.hero .hero-center .tool .box input { padding: 20px 22px; font-size: 17px; border-radius: 14px; }
+.hero .hero-center .tool .box .btn { padding: 0 30px; font-size: 16px; border-radius: 14px; }
 /* Everything inside the tool centres too — the input row, the notes under it,
    the buttons. Left-aligned children inside a centred column read as off-centre
    even when the block itself is dead centre. */
@@ -896,8 +896,17 @@ footer.site nav a:hover { color: var(--text); }
 .hero .hero-center .tool .hint,
 .hero .hero-center .tool .tool-hint { text-align: center; }
 .hero .hero-center .trust { margin-top: 24px; }
-.hero .hero-center h1 { font-size: clamp(34px, 4.8vw, 56px); margin: 18px 0 14px; }
-.hero .hero-center p.sub { max-width: 500px; margin: 0 auto; font-size: 16.5px; }
+/* One line running across, rather than a stacked block. Sized off the
+   viewport so it stays on one line as far down as it sensibly can, then
+   wraps rather than shrinking to nothing on a phone. */
+.hero .hero-center h1 {
+  font-size: clamp(30px, 4.6vw, 60px); margin: 0; line-height: 1.08;
+  letter-spacing: -.03em; max-width: none; white-space: nowrap;
+}
+@media (max-width: 760px) {
+  .hero .hero-center h1 { white-space: normal; }
+}
+.hero .hero-center p.sub { max-width: 620px; margin: 0 auto; font-size: 17px; }
 
 /* Generation settings are a Studio thing. On the home pages the job is to get
    one link in and one button pressed; the defaults handle the rest, and the
