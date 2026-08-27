@@ -47,6 +47,9 @@ const go = $("go"), urlInput = $("url"), panel = $("panel"), logEl = $("log"),
 
 let ME = null;              // { user, plan, usage }
 let currentJobId = null;    // the job the Stop button acts on
+// Bumped whenever a new poll loop starts; older loops see a stale token and
+// stop, so two loops can never drive the same progress bar.
+let pollToken = 0;
 let restoreSettings = null; // settings chosen before signing up
 
 // Decide login-gated vs ready, and configure the plan-specific controls.
@@ -129,26 +132,43 @@ async function initTool() {
   if (signedIn) { loadBackgroundList(); if ($("autoCard")) initAutopilot(); }
   if (urlInput.value.trim()) loadPreview(normalizeLink(urlInput.value));
 
-  // A job keeps running on the server even if this tab was closed — pick it
-  // back up rather than pretending nothing is happening.
-  if (signedIn) {
-    try {
-      const { jobs } = await (await fetch("/api/jobs/mine")).json();
-      if (jobs && jobs.length) {
-        const j = jobs[0];
-        currentJobId = j.id;
-        panel.classList.add("show");
-        $("errBox").style.display = "none";
-        $("progWrap").style.display = "block";
-        $("stopBtn").style.display = "inline-block";
-        spin.style.display = "inline-block";
-        go.disabled = true; $("goFile").disabled = true;
-        $("progHint").textContent = "Picked this run back up — it kept going while you were away.";
-        document.getElementById("try").scrollIntoView({ behavior: "smooth" });
-        poll(j.id);
-      }
-    } catch (_) { /* nothing running */ }
-  }
+}
+
+// Just the usage counter — poll() calls this when a run ends. It must not do
+// the rest of initTool()'s work, which is page setup and only valid once.
+async function refreshUsage() {
+  try { ME = await (await fetch("/api/me")).json(); } catch (_) { return; }
+  if (ME && ME.user && document.body.dataset.planMeta === "on") renderMeta();
+}
+
+// Re-attach to a run that is still going on the server after the tab was
+// closed or reloaded.
+//
+// This deliberately lives outside initTool(): poll() calls initTool() when a
+// run ends to refresh the usage counter, and while the reattach lived in there
+// each finished run started another poll loop, which started another... The
+// page ended up polling the same job five times at once and the progress bar
+// sat at "Starting… 0%" while they fought each other.
+let resumeChecked = false;
+async function resumeRunningJob() {
+  if (resumeChecked || !(ME && ME.user)) return;
+  resumeChecked = true;
+  try {
+    const { jobs } = await (await fetch("/api/jobs/mine")).json();
+    if (!jobs || !jobs.length) return;
+    const j = jobs[0];
+    currentJobId = j.id;
+    panel.classList.add("show");
+    $("errBox").style.display = "none";
+    $("progWrap").style.display = "block";
+    $("stopBtn").style.display = "inline-block";
+    $("stopBtn").disabled = false;
+    $("stopBtn").textContent = "Stop";
+    spin.style.display = "inline-block";
+    go.disabled = true; $("goFile").disabled = true;
+    $("progHint").textContent = "Picked this run back up — it kept going while you were away.";
+    poll(j.id);
+  } catch (_) { /* nothing running */ }
 }
 
 
@@ -835,7 +855,9 @@ function paintProgress(d) {
   });
 }
 
-async function poll(jobId) {
+async function poll(jobId, token) {
+  if (token === undefined) token = ++pollToken;   // a fresh loop supersedes any older one
+  if (token !== pollToken) return;                // superseded — let this one die
   try {
     const r = await fetch("/api/jobs/" + jobId);
     const d = await r.json();
@@ -844,7 +866,7 @@ async function poll(jobId) {
 
     if (d.status === "running") {
       paintProgress(d);
-      setTimeout(() => poll(jobId), 1500);
+      setTimeout(() => poll(jobId, token), 1500);
     } else if (d.status === "done") {
       paintProgress({ ...d, stage: "done", progress: 100 });
       clearInterval(creepTimer); creepTimer = null;
@@ -856,7 +878,7 @@ async function poll(jobId) {
       $("progHint").textContent = "";
       go.disabled = false; $("goFile").disabled = !uploadId;
       renderClips(d.clips);
-      initTool(); // refresh usage counter
+      refreshUsage();
     } else if (d.status === "cancelled") {
       clearInterval(creepTimer); creepTimer = null;
       spin.style.display = "none";
@@ -865,11 +887,11 @@ async function poll(jobId) {
       $("progHint").textContent = "";
       go.disabled = false; $("goFile").disabled = !uploadId;
       currentJobId = null;
-      initTool(); // usage was refunded — refresh the counter
+      refreshUsage();
     } else {
       fail(d.error || "Something went wrong", d.errorCode, d.logs);
     }
-  } catch (err) { setTimeout(() => poll(jobId), 2000); }
+  } catch (err) { setTimeout(() => poll(jobId, token), 2000); }
 }
 
 function renderClips(clips) {
@@ -1127,4 +1149,4 @@ document.getElementById("stopBtn").addEventListener("click", async () => {
   setTimeout(() => { btn.disabled = false; btn.textContent = "Stop"; }, 3000);
 });
 
-initTool();
+initTool().then(resumeRunningJob);

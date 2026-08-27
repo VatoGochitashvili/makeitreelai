@@ -57,13 +57,24 @@ function throwIfCancelled() {
   if (ctx()?.signal?.aborted) throw new Cancelled();
 }
 
+// Kill a child and anything it spawned. Falls back to killing just the child
+// if the group is already gone.
+export function killTree(p) {
+  try { process.kill(-p.pid, "SIGKILL"); }
+  catch { try { p.kill("SIGKILL"); } catch { /* already dead */ } }
+}
+
 function run(cmd, args, { onLog } = {}) {
   throwIfCancelled();
   return new Promise((resolve, reject) => {
-    const p = spawn(cmd, args);
+    // detached puts the child in its own process group, so killing -pid takes
+    // its children too. yt-dlp spawns ffmpeg to pull the stream; without this,
+    // Stop killed yt-dlp and left that ffmpeg downloading the whole video —
+    // the run looked cancelled while the bandwidth kept being spent.
+    const p = spawn(cmd, args, { detached: true });
     const c = ctx();
     c?.children?.add(p);
-    const onAbort = () => { try { p.kill("SIGKILL"); } catch {} };
+    const onAbort = () => { killTree(p); };
     c?.signal?.addEventListener("abort", onAbort, { once: true });
     const cleanup = () => {
       c?.children?.delete(p);

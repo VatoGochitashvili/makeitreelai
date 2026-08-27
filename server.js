@@ -4,7 +4,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
-import { makeClips, synthSpeech, probeVideoMeta, probeDurationSec, withAiLogger, withJob, Cancelled, FORMATS } from "./src/pipeline.js";
+import { makeClips, synthSpeech, probeVideoMeta, probeDurationSec, withAiLogger, withJob, Cancelled, FORMATS, killTree } from "./src/pipeline.js";
 import { createWriteStream } from "node:fs";
 import { authRouter, attachUser, getUsage, bumpVideoUsage, refundVideoUsage, findUserById } from "./src/auth.js";
 import { schedulerRouter, schedulePost } from "./src/scheduler.js";
@@ -518,7 +518,7 @@ app.post("/api/jobs/:id/cancel", (req, res) => {
   if (job.status !== "running") return res.json({ ok: true, status: job.status });
 
   job.abort.abort();
-  for (const child of job.children) { try { child.kill("SIGKILL"); } catch {} }
+  for (const child of job.children) killTree(child);
   job.logs.push({ t: Date.now(), msg: "Cancelled by user." });
   res.json({ ok: true, status: "cancelling" });
 });
@@ -553,9 +553,17 @@ function shutdown(signal) {
   if (stopping) { process.exit(1); }   // second Ctrl+C: don't wait
   stopping = true;
 
-  const running = [...jobs.values()].filter((j) => j.status === "running").length;
+  const live = [...jobs.values()].filter((j) => j.status === "running");
   console.log(`\n\x1b[33m■\x1b[0m Stopping MakeItReel (${signal})…`);
-  if (running) console.log(`  ${running} job${running > 1 ? "s were" : " was"} still running and will not finish.`);
+  if (live.length) console.log(`  ${live.length} job${live.length > 1 ? "s were" : " was"} still running and will not finish.`);
+
+  // Job children run in their own process groups so Stop can take out
+  // yt-dlp's ffmpeg too — which also means they no longer die with this
+  // process. Take them down explicitly, or a download outlives the server.
+  for (const job of live) {
+    try { job.abort.abort(); } catch { /* already gone */ }
+    for (const child of job.children) killTree(child);
+  }
 
   server.close(() => {
     console.log(`\x1b[31m●\x1b[0m MakeItReel has stopped. localhost:${PORT} is no longer served.\n`);
