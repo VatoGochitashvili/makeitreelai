@@ -107,6 +107,11 @@ feature does to it, what comes out — in an app window, full width. The test is
 whether someone can say what the feature does without reading the paragraph
 beside it. Abstract shapes failed that test; so did a static UI panel.
 
+All seventeen share one small system, declared as tokens at the top of
+`demos.css`: three radii, three elevations, one accent used sparingly. That is
+what stops them reading as seventeen separate drawings — change a token, not a
+component, when something needs adjusting.
+
 The figures in a diagram must match the run beside it. Smart Frame draws its
 crop windows at 32% and 48% of the real source frame because those are the
 numbers the page quotes and the clips demonstrate; drawing them "about right"
