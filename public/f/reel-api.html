@@ -77,16 +77,17 @@
         not a recording of it working — the six features marked Live have real output
         on their pages, and this one will when it earns the badge.</p>
       </div>
-      <div class="pf-mock"><div class="ui "><div class="ui-bar"><i></i><i></i><i></i><span>Reel API</span></div><div class="ui-body">
+      <div class="pf-mock"><div class="ui"><div class="ui-bar"><i></i><i></i><i></i><span>Reel API</span></div><div class="ui-body">
   <pre class="api req">POST /v1/clip
 Authorization: Bearer sk_live_…
 
 { "url": "https://youtu.be/…", "clips": 5 }</pre>
   <pre class="api res">200 OK
 { "job": "a3f1", "clips": [
-    { "url": "…/clip_1.mp4", "score": 92 },
-    { "url": "…/clip_2.mp4", "score": 88 } ] }</pre></div></div></div>
-    </section>
+    { "url": "…/clip_1.mp4", "score": 92, "start": 7.6 },
+    { "url": "…/clip_2.mp4", "score": 88, "start": 72.4 } ] }</pre>
+  <div class="fl-note">The same pipeline the site runs, behind one endpoint</div></div></div></div>
+      </section>
 
 
 

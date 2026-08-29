@@ -73,20 +73,13 @@
 
     <section class="pf-block">
       <h2>What it actually produces</h2>
-      <div class="pf-mock"><div class="ui "><div class="ui-bar"><i></i><i></i><i></i><span>Framing</span></div><div class="ui-body">
-  <div class="ui-split">
-    <figure class="ui-phone"><video src="/demo-assets/clip-tight.mp4" poster="/demo-assets/clip-tight.jpg" autoplay muted loop playsinline></video><figcaption>Tight · 1.78× zoom</figcaption></figure>
-    <figure class="ui-phone"><video src="/demo-assets/clip-balanced.mp4" poster="/demo-assets/clip-balanced.jpg" autoplay muted loop playsinline></video><figcaption>Balanced · 1.17× zoom</figcaption></figure>
-    <div class="ui-controls">
-      <label>Framing</label>
-      <div class="opt on">Balanced — speaker with room</div>
-      <div class="opt">Tight — fills the frame</div>
-      <div class="opt">Wide — nothing cropped</div>
-      <div class="ui-note">Speaker found at 42% across the frame</div>
-    </div>
-  </div></div></div></div>
-
-<div class="ev-pair"><figure class="ev-media"><video src="/demo-assets/clip-tight.mp4" poster="/demo-assets/clip-tight.jpg" controls loop muted playsinline preload="metadata"></video><figcaption>Tight — fills the frame, 1.78× zoom</figcaption></figure><figure class="ev-media"><video src="/demo-assets/clip-balanced.mp4" poster="/demo-assets/clip-balanced.jpg" controls loop muted playsinline preload="metadata"></video><figcaption>Balanced — 1.17× zoom, the default</figcaption></figure></div><div class="ev-data">
+      <div class="pf-mock"><div class="ui"><div class="ui-bar"><i></i><i></i><i></i><span>Smart Frame</span><b>Real run</b></div><div class="ui-body"><div class="flow"><div class="fl-stage"><div class="fl-label">Your 16:9 source</div><div class="crop-src">
+      <img src="/demo-assets/source-frame.jpg" alt="">
+      <span class="crop-box tight"><b>Tight · 32%</b></span>
+      <span class="crop-box bal"><b>Balanced · 48%</b></span>
+      <span class="crop-pin">speaker · 42%</span>
+    </div><div class="fl-note">the crop window goes where the speaker is</div></div><div class="fl-arrow"></div><div class="fl-stage"><div class="fl-label">9:16 out</div><div class="ph-pair"><div class="ph-out"><video src="/demo-assets/clip-tight.mp4" poster="/demo-assets/clip-tight.jpg" autoplay muted loop playsinline></video><span>1.78×</span></div><div class="ph-out"><video src="/demo-assets/clip-balanced.mp4" poster="/demo-assets/clip-balanced.jpg" autoplay muted loop playsinline></video><span>1.17×</span></div></div><div class="fl-note">same moment, a third less zoom</div></div></div></div></div></div>
+      <div class="ev-pair"><figure class="ev-media"><video src="/demo-assets/clip-tight.mp4" poster="/demo-assets/clip-tight.jpg" controls loop muted playsinline preload="metadata"></video><figcaption>Tight — fills the frame, 1.78× zoom</figcaption></figure><figure class="ev-media"><video src="/demo-assets/clip-balanced.mp4" poster="/demo-assets/clip-balanced.jpg" controls loop muted playsinline preload="metadata"></video><figcaption>Balanced — 1.17× zoom, the default</figcaption></figure></div><div class="ev-data">
   <div class="ev-row"><span>Speaker found at</span><b>42% across the frame</b></div>
   <div class="ev-row"><span>Tight keeps</span><b>32% of the width · 1.78× zoom</b></div>
   <div class="ev-row"><span>Balanced keeps</span><b>48% of the width · 1.17× zoom</b></div>

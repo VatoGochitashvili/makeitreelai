@@ -102,9 +102,15 @@ If you add a feature, it needs three things in step: an entry in the menu and
 the on-page grid, a row on features.html, and a demo in demos.css.
 
 ## Feature demos
-Demos are replicas of the real interface (`public/demos.css`) — an app window
-with the same panels, controls and copy the product uses — sized full width so
-they can be read. Abstract shapes were tried first and explained nothing.
+Each demo is a mechanism diagram (`public/demos.css`): what goes in, what the
+feature does to it, what comes out — in an app window, full width. The test is
+whether someone can say what the feature does without reading the paragraph
+beside it. Abstract shapes failed that test; so did a static UI panel.
+
+The figures in a diagram must match the run beside it. Smart Frame draws its
+crop windows at 32% and 48% of the real source frame because those are the
+numbers the page quotes and the clips demonstrate; drawing them "about right"
+would make the page quietly wrong.
 
 Where the pipeline has real output, the demo plays that clip. Where it doesn't,
 the mockup is still built from real material (the actual API shape, the real
