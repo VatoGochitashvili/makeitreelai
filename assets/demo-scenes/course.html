@@ -1,0 +1,47 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{width:1080px;height:5400px;overflow:hidden;
+       background:linear-gradient(180deg,#7fc7ef 0%,#a8dcf5 30%,#cbeaf8 60%,#8fd0ef 100%)}
+  .sun{position:absolute;left:760px;top:180px;width:200px;height:200px;border-radius:50%;
+       background:radial-gradient(circle,#fff8d0,#ffe27a);filter:blur(2px);opacity:.9}
+  .cloud{position:absolute;background:#fff;border-radius:60px;opacity:.85;filter:blur(1px)}
+  .blk{position:absolute;border-radius:6px}
+  .grass{background:linear-gradient(180deg,#7fd45a 0%,#5cb03c 26%,#8a5a33 27%,#6b4526 100%);
+         box-shadow:inset 0 -6px 0 rgba(0,0,0,.14), 0 6px 14px rgba(0,0,0,.18)}
+  .stone{background:linear-gradient(180deg,#b9bec7,#8b9099);box-shadow:inset 0 -6px 0 rgba(0,0,0,.16), 0 6px 14px rgba(0,0,0,.18)}
+  .wood{background:linear-gradient(180deg,#c08a4e,#8d5f31);box-shadow:inset 0 -6px 0 rgba(0,0,0,.18), 0 6px 14px rgba(0,0,0,.2)}
+  .gold{background:linear-gradient(180deg,#ffd85e,#e0a41f);box-shadow:0 0 22px rgba(255,214,94,.7)}
+  .water{background:linear-gradient(180deg,#4aa8e8,#2b7fc4);opacity:.92}
+</style></head><body>
+<script>
+  // A blocky parkour course. Procedural so it never repeats a visible pattern,
+  // and entirely ours — the whole reason we can publish it.
+  const d = document.body, R = (a,b)=>a+Math.random()*(b-a);
+  d.insertAdjacentHTML('beforeend','<div class="sun"></div>');
+  for (let i=0;i<26;i++) {
+    const w=R(120,300), h=w*R(.28,.4);
+    d.insertAdjacentHTML('beforeend',
+      `<div class="cloud" style="left:${R(-60,1000)}px;top:${R(60,5200)}px;width:${w}px;height:${h}px"></div>`);
+  }
+  const kinds=['grass','stone','wood'];
+  let y = 5200;
+  while (y > -200) {
+    const cols = Math.round(R(2,5));
+    const bw = R(90,190), gap = R(30,90);
+    const startX = R(40, 1040 - (cols*(bw+gap)));
+    const k = kinds[Math.floor(Math.random()*kinds.length)];
+    for (let c=0;c<cols;c++) {
+      const x = startX + c*(bw+gap), h = R(44,86);
+      d.insertAdjacentHTML('beforeend',
+        `<div class="blk ${k}" style="left:${x}px;top:${y}px;width:${bw}px;height:${h}px"></div>`);
+      if (Math.random()<.22)
+        d.insertAdjacentHTML('beforeend',
+          `<div class="blk gold" style="left:${x+bw/2-14}px;top:${y-46}px;width:28px;height:28px;border-radius:50%"></div>`);
+    }
+    if (Math.random()<.18)
+      d.insertAdjacentHTML('beforeend',
+        `<div class="blk water" style="left:0;top:${y+120}px;width:1080px;height:${R(50,90)}px"></div>`);
+    y -= R(150, 250);
+  }
+</script>
+</body></html>

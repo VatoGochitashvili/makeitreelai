@@ -76,8 +76,11 @@ apps, OAuth, and (for TikTok) an audit — start the applications early.
 `public/features.html` is the index; `public/f/<slug>.html` is a page each.
 
 The demo source in `public/demo-assets/` is ours end to end — our script, our
-TTS, a picture drawn with ffmpeg — precisely so the outputs can be published
-without using anyone else's footage. Everything on a Live feature's page came
+TTS, and two scenes rendered from `assets/demo-scenes/` (a podcast studio and a
+blocky parkour course) — precisely so the outputs can be published without using
+anyone else's footage. The first version drew the scene with ffmpeg boxes and it
+looked it; the scenes are HTML rendered through headless Chrome instead, which
+is why the clips now read as real short-form content. Everything on a Live feature's page came
 out of a real pipeline run against it (`run.json` holds the actual moment picks
 and model calls).
 

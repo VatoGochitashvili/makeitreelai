@@ -1,23 +1,48 @@
 {
-  "generatedAt": "2026-08-27T22:07:20.957Z",
-  "moments": [
+  "generatedAt": "2026-08-29T19:43:48.195Z",
+  "picks": [
     {
+      "name": "clip-balanced",
       "title": "The Real Problem with Recording",
-      "hook": "The problem was never the recording.",
-      "virality": 75,
-      "start": 7.6,
-      "end": 35.4,
-      "seconds": 27.8
+      "seconds": 21.6
+    },
+    {
+      "name": "clip-tight",
+      "title": "The Real Problem with Recording",
+      "seconds": 21.6
+    },
+    {
+      "name": "clip-split",
+      "title": "The Real Problem with Recording",
+      "seconds": 21.6
+    },
+    {
+      "name": "clip-brainrot",
+      "title": "Transform Your Content Creation Fast",
+      "seconds": 21.6
     }
   ],
   "aiLog": [
     "  🤖 Whisper (whisper-1): uploading 0.3 MB…",
-    "  🤖 Whisper done in 3.3s — 10 segments, 120 words, ~$0.004",
-    "  🤖 GPT (gpt-4o-mini): analysing 10 transcript segments…",
-    "  🤖 GPT done in 1.2s — 590 in / 80 out tokens, ~$0.0001",
+    "  🤖 Whisper done in 3.8s — 9 segments, 120 words, ~$0.004",
+    "  🤖 GPT (gpt-4o-mini): analysing 9 transcript segments…",
+    "  🤖 GPT done in 1.8s — 583 in / 111 out tokens, ~$0.0002",
     "  🤖 Whisper (whisper-1): uploading 0.3 MB…",
-    "  🤖 Whisper done in 3.5s — 10 segments, 120 words, ~$0.004",
-    "  🤖 GPT (gpt-4o-mini): analysing 10 transcript segments…",
-    "  🤖 GPT done in 1.7s — 590 in / 73 out tokens, ~$0.0001"
+    "  🤖 Whisper done in 4.3s — 9 segments, 120 words, ~$0.004",
+    "  🤖 GPT (gpt-4o-mini): analysing 9 transcript segments…",
+    "  🤖 GPT done in 1.8s — 581 in / 119 out tokens, ~$0.0002",
+    "  🤖 Whisper (whisper-1): uploading 0.3 MB…",
+    "  🤖 Whisper done in 3.6s — 9 segments, 120 words, ~$0.004",
+    "  🤖 GPT (gpt-4o-mini): analysing 9 transcript segments…",
+    "  🤖 GPT done in 1.4s — 583 in / 105 out tokens, ~$0.0002",
+    "  🤖 Whisper (whisper-1): uploading 0.3 MB…",
+    "  🤖 Whisper done in 4.6s — 9 segments, 120 words, ~$0.004",
+    "  🤖 GPT (gpt-4o-mini): analysing 9 transcript segments…",
+    "  🤖 GPT done in 1.1s — 583 in / 110 out tokens, ~$0.0002",
+    "  🤖 GPT (gpt-4o-mini): writing a 57-word narration script…",
+    "  🤖 GPT done in 0.8s — ~$0.0001",
+    "  🤖 TTS (gpt-4o-mini-tts, voice \"nova\"): 296 chars, ~$0.0044",
+    "  🤖 Whisper (whisper-1): uploading 0.3 MB…",
+    "  🤖 Whisper done in 1.9s — 9 segments, 51 words, ~$0.002"
   ]
 }
