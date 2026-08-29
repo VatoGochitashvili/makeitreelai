@@ -874,14 +874,16 @@ urlInput.addEventListener("input", () => {
 
 function renderMeta() {
   const p = ME.plan, u = ME.usage;
-  const left = u.videosPerMonth === -1
-    ? "Unlimited videos"
-    : `${Math.max(0, u.videosPerMonth - u.videos)} of ${u.videosPerMonth} videos left this month`;
+  // "Unlimited videos" was never true — it was an unmetered tab. Show the real
+  // budget, in the unit that is actually spent.
+  const hrs = (m) => (m % 60 === 0 ? `${m / 60}h` : `${(m / 60).toFixed(1)}h`);
+  const low = u.minutesLeft <= u.minutesPerMonth * 0.1;
+  const left = `<span${low ? ' class="meta-low"' : ''}>${hrs(u.minutesLeft)} of ${hrs(u.minutesPerMonth)} left this month</span>`;
   toolMeta.innerHTML =
     `<span class="meta-plan">${p.name} plan</span>` +
     `<span class="meta-dot">•</span><span>${p.clipsPerVideo} clips / video</span>` +
     `<span class="meta-dot">•</span><span>${p.resolution}p</span>` +
-    `<span class="meta-dot">•</span><span>${left}</span>` +
+    `<span class="meta-dot">•</span>${left}` +
     `<a class="meta-upgrade" href="/account.html">Manage plan →</a>`;
 }
 
@@ -1006,6 +1008,14 @@ function paintEta() {
 }
 
 function paintProgress(d) {
+  // Waiting for a slot is not the same as being stuck at 2%.
+  if (d.queued > 0) {
+    statusText.textContent = d.queued === 1
+      ? "Next in line — starting shortly…"
+      : `Waiting — ${d.queued} runs ahead of you`;
+    $("progEta").textContent = "";
+    return;
+  }
   targetPct = Math.max(2, Math.min(100, d.progress || 0));
   updateEta(d.progress || 0, d.elapsedMs);
   ceilPct = STAGE_CEIL[d.stage] ?? 100;

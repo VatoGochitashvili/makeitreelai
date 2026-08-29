@@ -114,7 +114,8 @@ export function monthKey(d = new Date()) {
 // Returns the user's usage record for the current month, resetting on rollover.
 export function getUsage(user) {
   const m = monthKey();
-  if (!user.usage || user.usage.month !== m) user.usage = { month: m, videos: 0 };
+  if (!user.usage || user.usage.month !== m) user.usage = { month: m, videos: 0, minutes: 0 };
+  if (user.usage.minutes == null) user.usage.minutes = 0;   // accounts from before minutes existed
   return user.usage;
 }
 // Cancelling a run gives the monthly allowance back.
@@ -128,6 +129,16 @@ export function refundVideoUsage(user) {
 export function bumpVideoUsage(user) {
   const u = getUsage(user);
   u.videos += 1;
+  persist();
+  return u;
+}
+
+// Source minutes are what actually cost money, so they are what we meter.
+// Charged from the known duration where we have one, and reconciled against the
+// real figure once the transcript tells us the truth.
+export function chargeMinutes(user, minutes) {
+  const u = getUsage(user);
+  u.minutes = Math.max(0, u.minutes + (Number(minutes) || 0));
   persist();
   return u;
 }
@@ -185,7 +196,11 @@ authRouter.get("/me", (req, res) => {
   res.json({
     user: publicUser(user),
     plan,
-    usage: { videos: usage.videos, videosPerMonth: plan.videosPerMonth },
+    usage: {
+      videos: usage.videos, videosPerMonth: plan.videosPerMonth,
+      minutes: Math.round(usage.minutes), minutesPerMonth: plan.minutesPerMonth,
+      minutesLeft: Math.max(0, Math.round(plan.minutesPerMonth - usage.minutes)),
+    },
     connections: user.connections || {},
   });
 });

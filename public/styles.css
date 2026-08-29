@@ -1310,3 +1310,4 @@ body.studio .tool { max-width: 100%; }
 .rm-row + .rm-row { border-top: 1px solid var(--line); }
 .rm-row b { flex: 0 0 168px; font-size: 14px; color: var(--text); font-weight: 600; }
 .rm-row span { flex: 1; min-width: 220px; font-size: 13.5px; color: var(--muted); line-height: 1.55; }
+.meta-low { color: #f5b971; font-weight: 600; }

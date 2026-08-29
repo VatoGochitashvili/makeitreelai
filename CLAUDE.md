@@ -169,15 +169,41 @@ they'd need the history.
    motion energy, which is enough for someone who walks or leans but knows
    nothing about faces. With two people it follows whoever moved last. Real
    active-speaker detection would pick whoever is *talking*.
-3. **Accounts + Stripe** — login + $19/mo subscription, per-plan clip limits.
+3. **Stripe** — the plans, gating and metering all exist; there is no way to
+   take money. This is the gap between a project and a business.
 4. **Real platform posting** — replace the simulated publisher in `src/scheduler.js`
    with TikTok/IG/YouTube API calls. This is what makes autopilot actually autopilot.
-5. **Persist jobs** — move the in-memory `jobs` Map to a database.
-6. **Job queue** — concurrent runs all render at once; nothing limits parallel
-   ffmpeg/Whisper work per server.
+5. **A real database** — job state and accounts are JSON files behind a
+   debounced write. Fine for one box; not fine for two.
 
 Clip files are swept after `CLIP_RETENTION_DAYS` (default 30) — see
 `sweepOldClips` in `src/reels.js`.
+
+## Spend control
+Transcription is charged by the minute, so minutes are what we meter — not
+videos. A "videos per month" limit prices a 3-minute clip the same as a 3-hour
+show, which is how the old unlimited Creator tier quietly lost money: a customer
+running a hundred 2-hour podcasts cost ~$73 and paid $19.
+
+`minutesPerMonth` is the budget, `maxSourceMinutes` stops one enormous file
+eating it in a single run. Length is checked up front where it is already known
+(uploads are probed at upload time, links from the preview cache), and the real
+figure is charged after the run from the audio we actually transcribed.
+
+At the ceiling each plan spends ~38% of its revenue on transcription. If a
+plan's price or the Whisper rate changes, `MINUTE_COST` in `src/plans.js` is
+there to redo the sum with.
+
+## Jobs and the queue
+`MAX_CONCURRENT_JOBS` (default 1) caps parallel renders. ffmpeg and Whisper will
+each happily take a whole box, so three simultaneous runs on one server serve
+nobody well. Waiting jobs report `queued` position and the UI says so rather
+than showing a stalled progress bar.
+
+Job state is written through to `.data/jobs.json`. The handles (AbortController,
+child processes) can't be serialised, so on boot anything left "running" is
+marked `MIR-RESTART` — a deploy used to kill a run and leave the page waiting
+for progress that would never arrive.
 
 ## Conventions
 - Keep the pipeline modular (one function per stage) so stages can be swapped.

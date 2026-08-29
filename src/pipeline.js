@@ -1586,7 +1586,10 @@ export async function makeClips(url, log = () => {}, opts = {}) {
     }
     progress("done", 100);
     log("Done! Clips are ready.");
-    return { workDir, clips: results };
+    // What we actually transcribed, so the account is charged the real figure
+    // rather than whatever the metadata claimed before the run.
+    const sourceSeconds = await probeDurationSec(analysisFile).catch(() => null);
+    return { workDir, clips: results, sourceSeconds };
   } catch (err) {
     log("Error: " + err.message);
     throw err;

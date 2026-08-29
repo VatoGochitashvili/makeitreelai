@@ -6,11 +6,11 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { makeClips, synthSpeech, probeVideoMeta, probeDurationSec, withAiLogger, withJob, Cancelled, FORMATS, killTree } from "./src/pipeline.js";
 import { createWriteStream } from "node:fs";
-import { authRouter, attachUser, getUsage, bumpVideoUsage, refundVideoUsage, findUserById } from "./src/auth.js";
+import { authRouter, attachUser, getUsage, bumpVideoUsage, refundVideoUsage, chargeMinutes, findUserById } from "./src/auth.js";
 import { schedulerRouter, schedulePost } from "./src/scheduler.js";
 import { reelsRouter, addReels, startRetentionSweep, retentionDays } from "./src/reels.js";
-import { planOf, VOICE_IDS } from "./src/plans.js";
-import { DATA_DIR } from "./src/store.js";
+import { planOf, VOICE_IDS, fmtHours } from "./src/plans.js";
+import { DATA_DIR, readJSON, writeJSON } from "./src/store.js";
 import { fetchPodcastFeed, normalizeUrl, isDirectMedia } from "./src/sources.js";
 import { workerRouter, workerEnabled, requestDownload, workerOnline } from "./src/worker-queue.js";
 import { backgroundsRouter, loadBackgrounds, findBackground, anyBackground, backgroundsFor } from "./src/backgrounds.js";
@@ -138,7 +138,63 @@ const uploadSweep = setInterval(async () => {
 uploadSweep.unref?.();
 
 // in-memory job store (fine for MVP; swap for a DB later)
-const jobs = new Map(); // id -> { logs:[], status, clips:[], error }
+// Video preview: title, author, thumbnail and — crucially — duration, which
+// the range selector needs. yt-dlp gives the real duration; oEmbed is the
+// fallback (no duration, so the UI then just uses the whole video).
+// Cached per URL so retyping doesn't re-run yt-dlp.
+const previewCache = new Map();
+
+// Jobs live in memory because they hold an AbortController and child process
+// handles, but the *state* is written through to disk. A deploy used to kill a
+// customer's forty-minute run and leave the page waiting for progress that
+// would never come; now the run is marked interrupted and says so.
+const jobs = new Map(); // id -> { logs:[], status, clips:[], error, ... }
+
+const JOB_FIELDS = ["id","userId","status","stage","progress","detail","error","errorCode",
+                    "clips","startedAt","source","auto","label"];
+function saveJobs() {
+  writeJSON("jobs.json", () => [...jobs.values()]
+    .filter((j) => Date.now() - (j.startedAt || 0) < 7 * 86400_000)
+    .map((j) => Object.fromEntries(JOB_FIELDS.map((k) => [k, j[k]]))));
+}
+for (const j of readJSON("jobs.json", [])) {
+  if (j.status === "running" || j.status === "queued") {
+    j.status = "error";
+    j.error = "The server restarted while this was running. Nothing was charged for the unfinished part — start it again.";
+    j.errorCode = "MIR-RESTART";
+  }
+  j.logs = j.logs || [];
+  jobs.set(j.id, j);
+}
+saveJobs();   // write the interruption back, or the next boot re-reads "running"
+
+// One render at a time by default. ffmpeg and Whisper are both happy to eat a
+// whole box, so three people generating at once on one server means three
+// concurrent encodes and a machine that serves nobody well.
+const MAX_CONCURRENT = Math.max(1, Number(process.env.MAX_CONCURRENT_JOBS || 1));
+let runningJobs = 0;
+const jobQueue = [];   // [{ id, go }]
+
+function queuePosition(id) {
+  const i = jobQueue.findIndex((q) => q.id === id);
+  return i === -1 ? 0 : i + 1;
+}
+function acquireSlot(id) {
+  if (runningJobs < MAX_CONCURRENT) { runningJobs++; return Promise.resolve(true); }
+  return new Promise((go) => jobQueue.push({ id, go }));
+}
+function releaseSlot() {
+  runningJobs = Math.max(0, runningJobs - 1);
+  const next = jobQueue.shift();
+  if (next) { runningJobs++; next.go(true); }
+}
+function dropFromQueue(id) {
+  const i = jobQueue.findIndex((q) => q.id === id);
+  if (i === -1) return false;
+  const [q] = jobQueue.splice(i, 1);
+  q.go(false);        // let its runner exit without doing the work
+  return true;
+}
 
 // Start a clipping job — requires login; enforces the user's plan limits.
 app.post("/api/clip", async (req, res) => {
@@ -180,6 +236,40 @@ app.post("/api/clip", async (req, res) => {
       error: `You've used all ${plan.videosPerMonth} videos on the ${plan.name} plan this month. Upgrade for more.`,
       upgrade: true,
     });
+  }
+
+  // Monthly minute budget. Transcription is charged by the minute, so minutes
+  // are what we meter — a plan measured in "videos" prices a 3-minute clip the
+  // same as a 3-hour show, which is how an unlimited tier quietly loses money.
+  const left = plan.minutesPerMonth - usage.minutes;
+  if (left <= 0) {
+    return res.status(403).json({
+      error: `You've used your ${fmtHours(plan.minutesPerMonth)} of video this month on the ${plan.name} plan. ` +
+             `It resets on the 1st, or you can upgrade now.`,
+      upgrade: true,
+    });
+  }
+
+  // Where the length is already known, refuse before spending rather than after.
+  let knownMinutes = null;
+  if (uploadId && uploads.get(uploadId)?.duration) knownMinutes = uploads.get(uploadId).duration / 60;
+  else if (previewCache.get(cleanUrl)?.duration) knownMinutes = previewCache.get(cleanUrl).duration / 60;
+
+  if (knownMinutes != null) {
+    if (knownMinutes > plan.maxSourceMinutes) {
+      return res.status(403).json({
+        error: `That video is ${Math.round(knownMinutes)} minutes. The ${plan.name} plan takes sources up to ` +
+               `${fmtHours(plan.maxSourceMinutes)} — trim it, or upgrade.`,
+        upgrade: true,
+      });
+    }
+    if (knownMinutes > left) {
+      return res.status(403).json({
+        error: `That video is ${Math.round(knownMinutes)} minutes and you have ${Math.round(left)} left this month. ` +
+               `Your allowance resets on the 1st.`,
+        upgrade: true,
+      });
+    }
   }
 
   // Voiceover is a paid-plan capability.
@@ -277,6 +367,7 @@ export function startJob(user, o) {
   job.userId = user.id;
   console.log(`\n▶ [${id.slice(0, 6)}] new job — ${user.email} — ${sourceFile ? "uploaded file" : cleanUrl}`);
   jobs.set(id, job);
+  saveJobs();
 
   const short = id.slice(0, 6);
   const log = (msg) => {
@@ -293,9 +384,11 @@ export function startJob(user, o) {
   };
 
   (async () => {
+  const gotSlot = await acquireSlot(id);
+  if (!gotSlot) return;                 // cancelled while waiting
   try {
     // Scope model-call logging to this job so concurrent runs don't mix.
-    const { workDir, clips } = await withJob(
+    const { workDir, clips, sourceSeconds } = await withJob(
       { signal: job.abort.signal, children: job.children },
       () => withAiLogger(log, () => makeClips(cleanUrl, log, {
       maxClips: o.maxClips,
@@ -332,9 +425,17 @@ export function startJob(user, o) {
         format: c.format || "clip", script: c.script || null,
       });
     }
+    // Meter what was actually processed. Charged here rather than up front
+    // because a link's advertised duration is a guess until we have the audio.
+    if (sourceSeconds) {
+      chargeMinutes(user, sourceSeconds / 60);
+      console.log(`  [${id.slice(0, 6)}] charged ${(sourceSeconds / 60).toFixed(1)} min ` +
+                  `(${getUsage(user).minutes.toFixed(0)}/${planOf(user.plan).minutesPerMonth} this month)`);
+    }
     job.clips = published;
     job.status = "done";
     job.stage = "done"; job.progress = 100;
+    saveJobs();
     console.log(`✓ [${id.slice(0, 6)}] done — ${published.length} clips`);
     // save this batch to the user's "My Reels" library
     addReels(user.id, published, cleanUrl);
@@ -362,6 +463,9 @@ export function startJob(user, o) {
     // stays in the job so support can look it up.
     job.errorCode = "MIR-" + id.replace(/-/g, "").slice(0, 6).toUpperCase();
     console.error(`[${job.errorCode}] job ${id} failed:`, err.message);
+  } finally {
+    releaseSlot();
+    saveJobs();
   }
   })();
 
@@ -375,11 +479,6 @@ initAutopilot({ startJob, findUser: findUserById, schedulePost });
 // Clips are the biggest thing on disk and nothing was reclaiming them.
 startRetentionSweep((msg) => console.log("  " + msg));
 
-// Video preview: title, author, thumbnail and — crucially — duration, which
-// the range selector needs. yt-dlp gives the real duration; oEmbed is the
-// fallback (no duration, so the UI then just uses the whole video).
-// Cached per URL so retyping doesn't re-run yt-dlp.
-const previewCache = new Map();
 
 app.get("/api/preview", async (req, res) => {
   const url = String(req.query.url || "");
@@ -526,6 +625,14 @@ app.post("/api/jobs/:id/cancel", (req, res) => {
 
   job.abort.abort();
   for (const child of job.children) killTree(child);
+  if (dropFromQueue(job.id)) {          // never started — settle it here
+    job.status = "cancelled";
+    job.stage = "cancelled";
+    job.error = "Cancelled — you were not charged for this run.";
+    refundVideoUsage(req.user);
+    saveJobs();
+    return res.json({ ok: true, status: "cancelled" });
+  }
   job.logs.push({ t: Date.now(), msg: "Cancelled by user." });
   res.json({ ok: true, status: "cancelling" });
 });
@@ -544,6 +651,7 @@ app.get("/api/jobs/:id", (req, res) => {
     progress: job.progress,
     detail: job.detail,
     elapsedMs: Date.now() - (job.startedAt || Date.now()),
+    queued: queuePosition(job.id),
   });
 });
 
