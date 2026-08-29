@@ -804,6 +804,108 @@ export async function findSubjectX(videoPath, start, dur, log) {
 }
 
 // 9:16 dimensions for a given target resolution (long edge height).
+// Where the subject is, over time.
+//
+// findSubjectX answers "where do they stand" with one number, which holds a
+// static crop on someone who never moves. This walks the same motion-energy
+// measurement in windows, so a speaker who drifts across the frame can be
+// followed instead of sliding out of shot.
+//
+// Returns keyframes { t, x } in clip-relative seconds, already simplified —
+// or null when there is nothing worth following.
+const TRACK_WINDOW_SEC = 1.2;
+const TRACK_DEADBAND = 0.035;   // ignore wobble smaller than this
+const TRACK_MIN_TRAVEL = 0.06;  // below this, a still camera looks better
+
+function subjectOfFrames(frames) {
+  if (frames.length < 2) return null;
+  const energy = new Float64Array(ANALYSIS_W);
+  for (let f = 1; f < frames.length; f++) {
+    const a = frames[f - 1], b = frames[f];
+    for (let y = 0; y < ANALYSIS_H; y++) {
+      const row = y * ANALYSIS_W;
+      for (let x = 0; x < ANALYSIS_W; x++) energy[x] += Math.abs(b[row + x] - a[row + x]);
+    }
+  }
+  const smooth = new Float64Array(ANALYSIS_W);
+  const R = 6;
+  for (let x = 0; x < ANALYSIS_W; x++) {
+    let sum = 0, n = 0;
+    for (let k = -R; k <= R; k++) {
+      const i = x + k;
+      if (i >= 0 && i < ANALYSIS_W) { sum += energy[i]; n++; }
+    }
+    smooth[x] = sum / n;
+  }
+  const peak = Math.max(...smooth);
+  if (!peak) return null;
+  const thresh = peak * 0.55;
+  let wsum = 0, w = 0, wide = 0;
+  for (let x = 0; x < ANALYSIS_W; x++) {
+    if (smooth[x] >= thresh) { wsum += x * smooth[x]; w += smooth[x]; wide++; }
+  }
+  if (!w || wide / ANALYSIS_W > 0.7) return null;
+  return Math.min(0.92, Math.max(0.08, (wsum / w) / (ANALYSIS_W - 1)));
+}
+
+export async function trackSubject(videoPath, start, dur, log) {
+  const frames = await sampleColumns(videoPath, start, dur);
+  const per = Math.max(2, Math.round(TRACK_WINDOW_SEC * ANALYSIS_FPS));
+  if (frames.length < per * 2) return null;   // too short to say anything about movement
+
+  const raw = [];
+  for (let i = 0; i + per <= frames.length; i += per) {
+    const x = subjectOfFrames(frames.slice(i, i + per + 1));
+    if (x != null) raw.push({ t: (i + per / 2) / ANALYSIS_FPS, x });
+  }
+  if (raw.length < 3) return null;
+
+  // Smooth, then hold still through small wobbles — a camera that twitches is
+  // worse than one that misses a little movement.
+  const sm = raw.map((p, i) => {
+    const lo = Math.max(0, i - 1), hi = Math.min(raw.length - 1, i + 1);
+    let sum = 0, n = 0;
+    for (let k = lo; k <= hi; k++) { sum += raw[k].x; n++; }
+    return { t: p.t, x: sum / n };
+  });
+  let held = sm[0].x;
+  for (const p of sm) {
+    if (Math.abs(p.x - held) < TRACK_DEADBAND) p.x = held; else held = p.x;
+  }
+
+  const travel = Math.max(...sm.map((p) => p.x)) - Math.min(...sm.map((p) => p.x));
+  if (travel < TRACK_MIN_TRAVEL) return null;  // basically still — let the static path handle it
+
+  // Drop points the straight line between their neighbours already covers, so
+  // the ffmpeg expression stays a handful of terms rather than dozens.
+  const keep = [sm[0]];
+  for (let i = 1; i < sm.length - 1; i++) {
+    const a = keep[keep.length - 1], b = sm[i], c = sm[i + 1];
+    const lerp = a.x + (c.x - a.x) * ((b.t - a.t) / (c.t - a.t || 1));
+    if (Math.abs(b.x - lerp) > 0.02) keep.push(b);
+  }
+  keep.push(sm[sm.length - 1]);
+
+  if (log) log(`  following the speaker across ${Math.round(travel * 100)}% of the frame ` +
+               `(${keep.length} keyframes)`);
+  return keep;
+}
+
+// Turn keyframes into a crop-x expression. Commas are escaped because the
+// filter string is comma-separated — an unescaped if() silently becomes three
+// broken filters.
+function cropXExpr(path, place) {
+  const pts = path.map((p) => ({ t: +p.t.toFixed(2), x: place(p.x) }));
+  let e = String(pts[pts.length - 1].x);
+  for (let i = pts.length - 2; i >= 0; i--) {
+    const a = pts[i], b = pts[i + 1];
+    const span = Math.max(0.01, b.t - a.t);
+    const ramp = `${a.x}+(${b.x - a.x})*(t-${a.t})/${span}`;
+    e = `if(lt(t\,${b.t})\,${ramp}\,${e})`;
+  }
+  return e;
+}
+
 function dims(resolution) {
   return resolution >= 1080 ? { W: 1080, H: 1920 } : { W: 720, H: 1280 };
 }
@@ -877,7 +979,7 @@ async function cutAudiogram(srcPath, clip, index, workDir, resolution, caption, 
   return out;
 }
 
-async function cutClip(videoPath, clip, index, workDir, resolution, caption, log, words, motion = "subtle", layout = "crop", subjectX = null) {
+async function cutClip(videoPath, clip, index, workDir, resolution, caption, log, words, motion = "subtle", layout = "crop", subjectX = null, subjectPath = null) {
   const out = path.join(workDir, `clip_${index + 1}.mp4`);
   const dur = Math.max(1, clip.end - clip.start);
   const { W, H } = dims(resolution);
@@ -922,17 +1024,21 @@ async function cutClip(videoPath, clip, index, workDir, resolution, caption, log
     } else {
       cropW = cropW - (cropW % 2);
       // Centre the kept slice on the speaker, then clamp inside the frame.
-      const target = subjectX == null ? 0.5 : 0.5 + (subjectX - 0.5) * 0.85;
-      let xOff = Math.round(d.w * target - cropW / 2);
-      xOff = Math.min(Math.max(xOff, 0), d.w - cropW);
-      xOff -= xOff % 2;
+      const place = (fx) => {
+        const target = 0.5 + (fx - 0.5) * 0.85;
+        let v = Math.round(d.w * target - cropW / 2);
+        v = Math.min(Math.max(v, 0), d.w - cropW);
+        return v - (v % 2);
+      };
+      const xOff = subjectX == null ? place(0.5) : place(subjectX);
       log(`  keeping ${Math.round((cropW / d.w) * 100)}% of the frame width ` +
           `(a full crop would keep ${Math.round((d.h * W / H / d.w) * 100)}%)`);
       filters.push(
         `split=2[bg][fg]`,
         `[bg]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},` +
           `boxblur=28:2,eq=brightness=-0.16:saturation=0.85[bgb]`,
-        `[fg]crop=${cropW}:${d.h}:${xOff}:0,scale=${W}:-2[fgs]`,
+        // A moving speaker gets a moving window; everyone else gets a still one.
+        `[fg]crop=${cropW}:${d.h}:${subjectPath ? "'" + cropXExpr(subjectPath, place) + "'" : xOff}:0,scale=${W}:-2[fgs]`,
         // Sit slightly above centre so bottom captions don't land on the face.
         `[bgb][fgs]overlay=(W-w)/2:(H-h)*0.42`
       );
@@ -952,7 +1058,7 @@ async function cutClip(videoPath, clip, index, workDir, resolution, caption, log
     // Cropping 16:9 to 9:16 discards ~68% of the width, so WHERE we crop
     // matters far more than any zoom. Put the subject in frame instead of
     // assuming they stand in the middle.
-    let xOff = null;
+    let xOff = null, xExpr = null;
     if (subjectX != null) {
       const dims = await probeDims(videoPath);
       if (dims) {
@@ -960,14 +1066,22 @@ async function cutClip(videoPath, clip, index, workDir, resolution, caption, log
         // then place the window over the subject and clamp to the frame.
         const f = Math.max(W / dims.w, H / dims.h);
         const scaledW = Math.round(dims.w * f);
-        const target = 0.5 + (subjectX - 0.5) * 0.85;   // ease towards centre
-        xOff = Math.round(Math.min(Math.max(scaledW * target - W / 2, 0), Math.max(0, scaledW - W)));
-        log(`  framing on the subject (offset ${xOff}px of ${scaledW - W}px available)`);
+        const place = (fx) => {
+          const target = 0.5 + (fx - 0.5) * 0.85;   // ease towards centre
+          return Math.round(Math.min(Math.max(scaledW * target - W / 2, 0), Math.max(0, scaledW - W)));
+        };
+        xOff = place(subjectX);
+        if (subjectPath) {
+          xExpr = cropXExpr(subjectPath, place);
+          log(`  the crop follows the speaker across the clip`);
+        } else {
+          log(`  framing on the subject (offset ${xOff}px of ${scaledW - W}px available)`);
+        }
       }
     }
     filters.push(
       `scale=${W}:${H}:force_original_aspect_ratio=increase`,
-      xOff == null ? `crop=${W}:${H}` : `crop=${W}:${H}:${xOff}:0`
+      xExpr ? `crop=${W}:${H}:'${xExpr}':0` : (xOff == null ? `crop=${W}:${H}` : `crop=${W}:${H}:${xOff}:0`)
     );
 
     // A very gentle push-in only — the crop is already a big magnification,
@@ -1396,10 +1510,16 @@ export async function makeClips(url, log = () => {}, opts = {}) {
       });
       // Where is the speaker in this moment? (two-phase analyses the section
       // once it's been fetched, below — there's no full file to sample yet.)
-      let subjectX = null;
+      let subjectX = null, subjectPath = null;
       if (layout !== "fit" && !twoPhase && format !== "brainrot") {
-        subjectX = await findSubjectX(video, moments[i].start,
-          moments[i].end - moments[i].start, log).catch(() => null);
+        const dur = moments[i].end - moments[i].start;
+        // Track first. A speaker who crosses the frame spreads their motion over
+        // it, which is exactly the case findSubjectX gives up on — so gating the
+        // tracker behind it would skip the clips that need it most.
+        subjectPath = await trackSubject(video, moments[i].start, dur, log).catch(() => null);
+        subjectX = subjectPath
+          ? subjectPath.reduce((a, p) => a + p.x, 0) / subjectPath.length
+          : await findSubjectX(video, moments[i].start, dur, log).catch(() => null);
       }
 
       let file;
@@ -1421,13 +1541,17 @@ export async function makeClips(url, log = () => {}, opts = {}) {
           ({ ...w, start: w.start - moments[i].start, end: w.end - moments[i].start }));
         // Only worth sampling when something will actually be cropped to a subject.
         const needsSubject = format === "split" || layout !== "fit";
-        const secSubject = needsSubject
-          ? await findSubjectX(sec, 0, moments[i].end - moments[i].start, log).catch(() => null)
+        const secDur = moments[i].end - moments[i].start;
+        const secPath = needsSubject && format !== "split"
+          ? await trackSubject(sec, 0, secDur, log).catch(() => null)
           : null;
+        const secSubject = !needsSubject ? null
+          : secPath ? secPath.reduce((a, p) => a + p.x, 0) / secPath.length
+          : await findSubjectX(sec, 0, secDur, log).catch(() => null);
         file = format === "split"
           ? await cutSplit(sec, local, i, workDir, resolution, caption, log, localWords, bgFor(i), secSubject)
           : await cutClip(sec, local, i, workDir, resolution, caption, log, localWords,
-                          motion, layout, layout === "fit" ? null : secSubject);
+                          motion, layout, layout === "fit" ? null : secSubject, secPath);
       } else if (isAudioOnly) {
         // There is no picture to stack — an audiogram already fills the frame.
         if (format === "split") log("  audio-only source — rendering an audiogram instead of a split screen.");
@@ -1436,7 +1560,7 @@ export async function makeClips(url, log = () => {}, opts = {}) {
         // subjectX was already sampled above — don't scan the frames twice.
         file = await cutSplit(video, moments[i], i, workDir, resolution, caption, log, words, bgFor(i), subjectX);
       } else {
-        file = await cutClip(video, moments[i], i, workDir, resolution, caption, log, words, motion, layout, subjectX);
+        file = await cutClip(video, moments[i], i, workDir, resolution, caption, log, words, motion, layout, subjectX, subjectPath);
       }
       let narrated = false;
       if (wantVoiceover && format !== "brainrot") {

@@ -41,6 +41,14 @@ to stop filling the frame edge to edge. Hence three `layout` options:
 - `crop` — the old full-bleed behaviour. Tightest.
 - `fit` — the whole frame, letterboxed. Smallest subject.
 
+`trackSubject` measures where the subject is over time and hands `cutClip` a
+handful of keyframes, which become a piecewise-linear crop-x expression so the
+window follows them. A speaker crossing the frame spreads their motion over it,
+which is the case `findSubjectX` gives up on — so the tracker runs first and the
+single-point measurement is the fallback, not the gate. Commas in that
+expression must be escaped: the filter string is comma-separated, and an
+unescaped `if()` silently becomes three broken filters.
+
 ## Output formats
 `format` in the generate request picks how a clip is rendered:
 - `clip` — the speaker, cropped to 9:16 (default)
@@ -157,9 +165,10 @@ they'd need the history.
 
 ## Roadmap / good next tasks
 1. **Animated word-by-word captions** — build an `.ass` subtitle file from Whisper word timestamps, burn with ffmpeg. Biggest quality win.
-2. **Face-tracking reframe** — `findSubjectX` is a motion-energy heuristic that
-   picks one crop position per clip. Real active-speaker detection would let the
-   frame follow someone as they move.
+2. **Face detection** — `trackSubject` follows a speaker across a clip by
+   motion energy, which is enough for someone who walks or leans but knows
+   nothing about faces. With two people it follows whoever moved last. Real
+   active-speaker detection would pick whoever is *talking*.
 3. **Accounts + Stripe** — login + $19/mo subscription, per-plan clip limits.
 4. **Real platform posting** — replace the simulated publisher in `src/scheduler.js`
    with TikTok/IG/YouTube API calls. This is what makes autopilot actually autopilot.
