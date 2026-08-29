@@ -13,7 +13,7 @@ import { planOf, VOICE_IDS } from "./src/plans.js";
 import { DATA_DIR } from "./src/store.js";
 import { fetchPodcastFeed, normalizeUrl, isDirectMedia } from "./src/sources.js";
 import { workerRouter, workerEnabled, requestDownload, workerOnline } from "./src/worker-queue.js";
-import { backgroundsRouter, loadBackgrounds, findBackground, anyBackground } from "./src/backgrounds.js";
+import { backgroundsRouter, loadBackgrounds, findBackground, anyBackground, backgroundsFor } from "./src/backgrounds.js";
 import { autopilotRouter, initAutopilot } from "./src/autopilot.js";
 import { catalogueRouter } from "./src/catalogue.js";
 
@@ -215,11 +215,14 @@ app.post("/api/clip", async (req, res) => {
       upgrade: true,
     });
   }
-  let background = null;
+  let background = null, backgrounds = [];
   if (FORMATS[chosenFormat].needsBackground) {
+    // One chosen background means exactly that; "any" hands over the whole
+    // library so a ten-clip run doesn't repeat the same footage ten times.
     background = backgroundId
       ? findBackground(backgroundId, user.id)
       : anyBackground(user.id);
+    backgrounds = backgroundId ? (background ? [background] : []) : backgroundsFor(user.id);
     if (!background) {
       return res.status(400).json({
         error: "That format needs gameplay footage. Add a background clip in the Studio first.",
@@ -246,7 +249,7 @@ app.post("/api/clip", async (req, res) => {
     url: cleanUrl, sourceFile, uploadId,
     maxClips: chosenClips, voiceover: wantVoiceover, voice: chosenVoice,
     caption: chosenCaption, length: chosenLength, range: chosenRange,
-    motion: chosenMotion, layout: chosenLayout, format: chosenFormat, background,
+    motion: chosenMotion, layout: chosenLayout, format: chosenFormat, background, backgrounds,
   });
   res.json({ jobId: id });
 });
@@ -260,6 +263,7 @@ export function startJob(user, o) {
   const sourceFile = o.sourceFile || null;
   const uploadId = o.uploadId || null;
   const background = o.background || null;
+  const backgrounds = o.backgrounds || [];
 
   const id = randomUUID();
   const job = {
@@ -305,6 +309,7 @@ export function startJob(user, o) {
       layout: o.layout,
       format: o.format,
       background: background && { name: background.name, file: background.file, duration: background.duration },
+      backgrounds,
       sourceFile,
       onProgress,
       // With a helper connected, links are fetched on the user's own machine

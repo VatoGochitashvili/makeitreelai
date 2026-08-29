@@ -1301,3 +1301,12 @@ body.studio .tool { max-width: 100%; }
 .pf-mock { margin-top: 4px; }
 .fp-main { max-width: 860px; }
 .fp-row { padding: 26px; }
+
+/* ---------- roadmap: named as intent, not sold as features ---------- */
+.rm { margin-top: 56px; }
+.rm-intro { color: var(--muted); font-size: 14px; line-height: 1.6; max-width: 60ch; margin: -6px 0 20px; }
+.rm-list { display: grid; gap: 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.rm-row { display: flex; gap: 18px; padding: 14px 18px; align-items: baseline; flex-wrap: wrap; }
+.rm-row + .rm-row { border-top: 1px solid var(--line); }
+.rm-row b { flex: 0 0 168px; font-size: 14px; color: var(--text); font-weight: 600; }
+.rm-row span { flex: 1; min-width: 220px; font-size: 13.5px; color: var(--muted); line-height: 1.55; }

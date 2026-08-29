@@ -73,7 +73,8 @@ Still simulated: actual publishing. `src/scheduler.js` flips due posts to
 apps, OAuth, and (for TikTok) an audit — start the applications early.
 
 ## Features pages
-`public/features.html` is the index; `public/f/<slug>.html` is a page each.
+`public/features.html` is the index; `public/f/<slug>.html` is a page each — seven
+of them, one per working feature.
 
 The demo source in `public/demo-assets/` is ours end to end — our script, our
 TTS, and two scenes rendered from `assets/demo-scenes/` (a podcast studio and a
@@ -122,16 +123,19 @@ the mockup is still built from real material (the actual API shape, the real
 activity log) and the page says "Not built yet".
 
 ## Feature naming
-The nav's Features menu and the on-page grid share one source: the list is
-generated, and every entry carries a Live or Soon badge. Six are Live (Moment
-Finder, Gameplay Shorts, Kinetic Captions, Smart Frame, Voice Over, Autopilot);
-ten are Soon and not built. Keep the badges honest — move one to Live only when
-it actually ships, and say so in the same commit.
+The nav's Features menu and the on-page grid share one generated list. Seven
+features, all Live — nothing on that page is a promise. Everything unbuilt is a
+line in `ROADMAP`, rendered as plain text at the foot of features.html and
+explicitly labelled as not built.
+
+Ten "Soon" entries used to sit alongside the real ones. They read as an
+unfinished product and invited a feature-count comparison we lose. Do not add a
+feature to the list before it works; add it to the roadmap.
 
 Names are deliberately ours, not Opus Clip's: Moment Finder (not ClipAnything),
 Kinetic Captions, Smart Frame (not AI Reframe), Autopilot (not Social
-scheduler), Cutaways (not AI B-Roll), Crew, Edit Room, Cover Art, Brand Kit,
-Timeline Export, Reel API, Agent Bridge, Showcase, Director.
+scheduler), Catalogue Miner, Gameplay Shorts, Voice Over.
+
 
 ## Back catalogue miner (`src/catalogue.js`)
 The thing no one-file-at-a-time tool can do. It transcribes a show's whole

@@ -51,6 +51,11 @@ let forcedRange = null;     // a moment picked from the back catalogue
 // Bumped whenever a new poll loop starts; older loops see a stale token and
 // stop, so two loops can never drive the same progress bar.
 let pollToken = 0;
+// Resolved when the current run reaches a terminal state, so a caller can wait
+// for one clip before starting the next. Batch generation needs this; nothing
+// else does, and it costs nothing when unused.
+let runSettled = null;
+function settleRun(how) { const f = runSettled; runSettled = null; if (f) f(how); }
 let restoreSettings = null; // settings chosen before signing up
 
 // Decide login-gated vs ready, and configure the plan-specific controls.
@@ -293,6 +298,28 @@ if ($("catCard")) {
           <div class="cat-why">${escapeHtml(m.why || "")}</div>
           <button class="btn ghost sm cat-make" data-i="${i}">Make this clip</button>
         </div>`).join("");
+
+      // Six results is the promise of this feature; clicking six times is not.
+      $("catMakeAll").style.display = "inline-block";
+      $("catMakeAll").textContent = `Make all ${d.moments.length}`;
+      $("catMakeAll").onclick = async () => {
+        const btn = $("catMakeAll");
+        btn.disabled = true;
+        for (let i = 0; i < d.moments.length; i++) {
+          btn.textContent = `Making ${i + 1} of ${d.moments.length}…`;
+          const m = d.moments[i];
+          activeSource = "link";
+          urlInput.value = m.episodeUrl;
+          forcedRange = { start: m.start, end: m.end };
+          const finished = new Promise((res) => { runSettled = res; });
+          start(false);
+          const how = await finished;
+          forcedRange = null;
+          if (how !== "done") break;      // stopped or failed — don't grind on
+        }
+        btn.textContent = `Make all ${d.moments.length}`;
+        btn.disabled = false;
+      };
 
       $("catResults").querySelectorAll(".cat-make").forEach((b) =>
         b.addEventListener("click", () => {
@@ -1015,6 +1042,7 @@ async function poll(jobId, token) {
       paintProgress(d);
       setTimeout(() => poll(jobId, token), 1500);
     } else if (d.status === "done") {
+      settleRun("done");
       paintProgress({ ...d, stage: "done", progress: 100 });
       clearInterval(creepTimer); creepTimer = null;
       $("progFill").style.width = "100%"; $("progPct").textContent = "100%";
@@ -1027,6 +1055,7 @@ async function poll(jobId, token) {
       renderClips(d.clips);
       refreshUsage();
     } else if (d.status === "cancelled") {
+      settleRun("cancelled");
       clearInterval(creepTimer); creepTimer = null;
       spin.style.display = "none";
       $("stopBtn").style.display = "none";
@@ -1036,6 +1065,7 @@ async function poll(jobId, token) {
       currentJobId = null;
       refreshUsage();
     } else {
+      settleRun("error");
       fail(d.error || "Something went wrong", d.errorCode, d.logs);
     }
   } catch (err) { setTimeout(() => poll(jobId, token), 2000); }

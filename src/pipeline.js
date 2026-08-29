@@ -1320,7 +1320,14 @@ export async function makeClips(url, log = () => {}, opts = {}) {
   // "split" and "brainrot" need gameplay footage to sit under the clip; without
   // a background there is nothing to render, so fall back to a standard clip.
   let format = FORMATS[opts.format] ? opts.format : "clip";
-  const background = opts.background || null;
+  // A run makes up to ten clips. With one background they all open on the same
+  // footage and read as the same video posted ten times, so rotate through
+  // whatever the user has — `background` stays supported for a single choice.
+  const backgrounds = (opts.backgrounds && opts.backgrounds.length)
+    ? opts.backgrounds
+    : (opts.background ? [opts.background] : []);
+  const background = backgrounds[0] || null;
+  const bgFor = (i) => backgrounds[i % backgrounds.length];
   if (FORMATS[format].needsBackground && !background) {
     log("No background footage selected — rendering standard clips instead.");
     format = "clip";
@@ -1403,7 +1410,7 @@ export async function makeClips(url, log = () => {}, opts = {}) {
         const { script, title } = await narrationScript(moments[i], source, log);
         if (title) moments[i].title = title;
         const narration = await speechWithWordTimings(script, voice, workDir, i, log);
-        file = await cutBrainrot(moments[i], i, workDir, resolution, caption, log, background, narration);
+        file = await cutBrainrot(moments[i], i, workDir, resolution, caption, log, bgFor(i), narration);
         moments[i].script = script;
       } else if (twoPhase) {
         // Fetch only these seconds, then cut from the start of that section.
@@ -1418,7 +1425,7 @@ export async function makeClips(url, log = () => {}, opts = {}) {
           ? await findSubjectX(sec, 0, moments[i].end - moments[i].start, log).catch(() => null)
           : null;
         file = format === "split"
-          ? await cutSplit(sec, local, i, workDir, resolution, caption, log, localWords, background, secSubject)
+          ? await cutSplit(sec, local, i, workDir, resolution, caption, log, localWords, bgFor(i), secSubject)
           : await cutClip(sec, local, i, workDir, resolution, caption, log, localWords,
                           motion, layout, layout === "fit" ? null : secSubject);
       } else if (isAudioOnly) {
@@ -1427,7 +1434,7 @@ export async function makeClips(url, log = () => {}, opts = {}) {
         file = await cutAudiogram(video, moments[i], i, workDir, resolution, caption, log);
       } else if (format === "split") {
         // subjectX was already sampled above — don't scan the frames twice.
-        file = await cutSplit(video, moments[i], i, workDir, resolution, caption, log, words, background, subjectX);
+        file = await cutSplit(video, moments[i], i, workDir, resolution, caption, log, words, bgFor(i), subjectX);
       } else {
         file = await cutClip(video, moments[i], i, workDir, resolution, caption, log, words, motion, layout, subjectX);
       }

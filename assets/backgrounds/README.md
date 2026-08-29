@@ -1,5 +1,9 @@
 # Background footage
 
+`parkour-course.mp4` ships with the app. We generated it (see
+`assets/demo-scenes/course.html`), so it can be distributed, and it means the
+split-screen and brainrot formats work before anyone has uploaded anything.
+
 Drop gameplay clips in here (`.mp4`, `.mov`, `.webm`, `.mkv`) and they become
 choices in the Studio for the split-screen and brainrot formats. They're picked
 up on server start, so restart after adding files.

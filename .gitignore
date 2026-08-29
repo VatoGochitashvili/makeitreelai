@@ -15,6 +15,9 @@ cookies*.txt
 yt-cookies*
 assets/backgrounds/*
 !assets/backgrounds/README.md
+# ours, generated from assets/demo-scenes/course.html — ships so the gameplay
+# formats work before anyone has uploaded footage of their own
+!assets/backgrounds/parkour-course.mp4
 
 # macOS
 .DS_Store
