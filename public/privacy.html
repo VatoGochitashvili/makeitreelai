@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy — MakeItReel</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-source="link">
+
+<nav class="site">
+  <div class="wrap">
+    <a class="logo" href="/">
+      <span class="dot"></span><span class="wm">makeit<span class="wm-reel">reel</span></span>
+    </a>
+
+    <!-- Primary: the three ways in, plus Features. Never dropped — Features
+         used to live in the marketing group and vanished on any window under
+         1300px, which is most laptops. -->
+    <div class="nav-links nav-group">
+      <a href="/" data-nav="link">YouTube</a>
+      <a href="/podcast.html" data-nav="podcast">Podcast</a>
+      <a href="/upload.html" data-nav="file">Upload</a>
+      <span class="has-menu" id="featTrigger">
+        <a href="/features.html" class="feat-trigger">Features <span class="caret">▾</span></a>
+        <div class="feat-menu" id="featMenu">
+          <div class="fm-grid">
+            <div class="fm-col"><div class="fm-head">Create</div><a class="fm-item" href="/f/moment-finder.html"><span class="fm-ic">◎</span><span class="fm-txt"><span class="fm-name">Moment Finder<span class="fb live">Live</span></span><span class="fm-blurb">Finds the clip-worthy moments in any long video and ranks them.</span></span></a><a class="fm-item" href="/f/catalogue-miner.html"><span class="fm-ic">⧗</span><span class="fm-txt"><span class="fm-name">Catalogue Miner<span class="fb live">Live</span></span><span class="fm-blurb">Reads your whole back catalogue and finds the best moments across every episode.</span></span></a><a class="fm-item" href="/f/gameplay-shorts.html"><span class="fm-ic">▶</span><span class="fm-txt"><span class="fm-name">Gameplay Shorts<span class="fb live">Live</span></span><span class="fm-blurb">Your clip over gameplay footage — or an AI voice reading it, source never shown.</span></span></a></div>
+            <div class="fm-col"><div class="fm-head">Polish</div><a class="fm-item" href="/f/kinetic-captions.html"><span class="fm-ic">⌁</span><span class="fm-txt"><span class="fm-name">Kinetic Captions<span class="fb live">Live</span></span><span class="fm-blurb">Word-by-word captions timed to the speech and burned in.</span></span></a><a class="fm-item" href="/f/smart-frame.html"><span class="fm-ic">⊞</span><span class="fm-txt"><span class="fm-name">Smart Frame<span class="fb live">Live</span></span><span class="fm-blurb">Keeps the speaker in frame at a sane zoom, not shoved in your face.</span></span></a><a class="fm-item" href="/f/voice-over.html"><span class="fm-ic">◍</span><span class="fm-txt"><span class="fm-name">Voice Over<span class="fb live">Live</span></span><span class="fm-blurb">Six AI voices that read a hook, or narrate the whole thing.</span></span></a></div>
+            <div class="fm-col"><div class="fm-head">Publish</div><a class="fm-item" href="/f/autopilot.html"><span class="fm-ic">∞</span><span class="fm-txt"><span class="fm-name">Autopilot<span class="fb live">Live</span></span><span class="fm-blurb">Connect your podcast feed once. New episodes clip and queue themselves.</span></span></a></div>
+            <div class="fm-col"><div class="fm-head">Everything else</div><a class="fm-item" href="/features.html#roadmap"><span class="fm-ic">→</span><span class="fm-txt"><span class="fm-name">On the roadmap</span><span class="fm-blurb">What we have not built yet, listed plainly.</span></span></a></div>
+          </div>
+        </div>
+      </span>
+    </div>
+
+    <span class="nav-sep"></span>
+
+    <!-- Secondary: dropped first when the bar runs short. -->
+    <div class="nav-links nav-group nav-marketing">
+      <a href="/#how">How it works</a>
+      <a href="/#pricing">Pricing</a>
+      <a href="/#faq">FAQ</a>
+    </div>
+
+    <div class="nav-right" id="navRight">
+      <!-- filled by auth-ui.js: either Login/Sign up, or account pill -->
+      <a class="btn ghost" href="/login.html">Log in</a>
+      <a class="btn" href="/register.html">Sign up free</a>
+    </div>
+  </div>
+</nav>
+
+<main class="wrap lg-main">
+  <header class="lg-head">
+    <h1>Privacy</h1>
+    <p class="lg-updated">Last updated 30 August 2026</p>
+    <p class="lg-intro">What we collect, why, and who else sees it. Written to be read rather than to be defensible.</p>
+  </header>
+  <nav class="lg-toc"><a href="#what">What we collect</a><a href="#payments">Payments</a><a href="#third-parties">Who else your content reaches</a><a href="#retention">How long we keep things</a><a href="#rights">Your rights</a><a href="#security">Security</a><a href="#contact">Contact</a></nav>
+    <section class="lg-s" id="what">
+      <h2>What we collect</h2>
+      <p>Your name, email address and a hashed password. Passwords are hashed with scrypt and a per-account salt — we cannot read yours, and neither can anyone who steals the database.</p>
+      <p>The links you paste and the files you upload, so we can make clips from them.</p>
+      <p>Transcripts of what you process. These are kept because features like the back catalogue miner search across everything you have processed; delete a video from your library and its transcript goes with it.</p>
+      <p>The clips we make for you, and basic usage counts (credits spent, videos processed) so we can bill correctly and show you what is left.</p>
+      <p>If you connect a podcast feed, its URL and the episodes we have already seen.</p>
+    </section>
+    <section class="lg-s" id="payments">
+      <h2>Payments</h2>
+      <p>We do not see your card. Payment is handled by Stripe on their own pages; we receive only a customer reference and whether your subscription is active.</p>
+      <p>We never store card numbers, expiry dates or security codes, because they never reach our servers.</p>
+    </section>
+    <section class="lg-s" id="third-parties">
+      <h2>Who else your content reaches</h2>
+      <p><b>OpenAI</b> — audio is sent to Whisper for transcription and transcripts to GPT to choose moments and write titles. If you use the AI voice, your script is sent to their text-to-speech. OpenAI's API terms state that API content is not used to train their models.</p>
+      <p><b>Stripe</b> — for payments, as above.</p>
+      <p><b>The source you point us at</b> — when you paste a link we fetch it, so that host sees a download request.</p>
+      <p>That is the complete list. We do not sell your data, we do not run advertising, and there are no analytics or tracking scripts on this site.</p>
+    </section>
+    <section class="lg-s" id="retention">
+      <h2>How long we keep things</h2>
+      <p>Generated clips are deleted after 30 days. This is a storage limit, not a policy preference — download anything you want to keep.</p>
+      <p>Uploaded source files are deleted within hours of processing.</p>
+      <p>Delete a clip from your library and the file is removed from our servers immediately, not flagged as hidden.</p>
+      <p>Close your account and everything associated with it is deleted, including transcripts and any connected feed.</p>
+    </section>
+    <section class="lg-s" id="rights">
+      <h2>Your rights</h2>
+      <p>You can ask for a copy of everything we hold about you, or ask us to delete it, by emailing the address below. We will do it within 30 days.</p>
+      <p>If you are in the UK or EU, the legal basis for processing your content is performance of a contract — we cannot make you clips without it.</p>
+    </section>
+    <section class="lg-s" id="security">
+      <h2>Security</h2>
+      <p>Sessions use signed, HTTP-only cookies. Passwords are scrypt-hashed. Card data never touches our systems.</p>
+      <p>We are a small operation and will not pretend otherwise: if we ever have a breach that affects you, we will tell you what happened and when, without waiting to have a comfortable explanation ready.</p>
+    </section>
+    <section class="lg-s" id="contact">
+      <h2>Contact</h2>
+      <p>Questions about any of this: <a href="mailto:hello@makeitreel.ai">hello@makeitreel.ai</a>.</p>
+    </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <a class="logo" href="/" style="font-size:18px">
+      <span class="dot"></span><span class="wm">makeit<span class="wm-reel">reel</span></span>
+    </a>
+    <nav>
+      <a href="#how">How it works</a><a href="#pricing">Pricing</a><a href="/login.html">Log in</a><a href="/register.html">Sign up</a>
+    </nav>
+    <div class="muted">© 2026 MakeItReel</div>
+  </div>
+
+    <div class="foot-legal"><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
+  </footer>
+<script src="/bg.js"></script>
+<script src="/nav.js"></script>
+<script src="/auth-ui.js"></script>
+</body>
+</html>

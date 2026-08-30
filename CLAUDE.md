@@ -202,6 +202,20 @@ anyone who opens devtools.
 The webhook route is mounted **before** `express.json()` because Stripe signs
 the raw bytes.
 
+## Legal pages
+`public/privacy.html` and `public/terms.html`, linked from every footer and
+from the signup form. Stripe will not process live payments without both, and
+TikTok, Instagram and YouTube all require them for their API applications — one
+piece of work unblocking three things.
+
+They describe what the app actually does: scrypt-hashed passwords, transcripts
+kept because the catalogue miner searches them, clips swept at 30 days, card
+data never touching our servers, the ownership confirmation. Keep them true —
+a privacy policy that describes a different product is worse than none.
+
+**They have not been reviewed by a lawyer.** They are written to be accurate
+and readable, not to be litigated. Get them looked at before taking real money.
+
 ## Trial, not a free tier
 Everyone signs up onto `trial`: the full Creator product for `TRIAL_DAYS`, with
 120 credits — two hours of video, enough to judge it. No card. A trial that
