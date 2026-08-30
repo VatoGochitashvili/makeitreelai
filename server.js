@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { makeClips, synthSpeech, probeVideoMeta, probeDurationSec, withAiLogger, withJob, Cancelled, FORMATS, killTree, checkYtdlpAge } from "./src/pipeline.js";
 import { createWriteStream } from "node:fs";
-import { authRouter, attachUser, getUsage, bumpVideoUsage, refundVideoUsage, creditBalance, spendCredits, findUserById } from "./src/auth.js";
+import { authRouter, attachUser, getUsage, bumpVideoUsage, refundVideoUsage, creditBalance, spendCredits, activePlan, findUserById } from "./src/auth.js";
 import { schedulerRouter, schedulePost } from "./src/scheduler.js";
 import { reelsRouter, addReels, startRetentionSweep, retentionDays } from "./src/reels.js";
 import { planOf, VOICE_IDS, fmtHours, CREDIT_PACKS } from "./src/plans.js";
@@ -84,7 +84,7 @@ app.post("/api/upload", async (req, res) => {
   const user = req.user;
   if (!user) return res.status(401).json({ error: "Please log in to upload." });
 
-  const plan = planOf(user.plan);
+  const plan = activePlan(user);
   const maxBytes = plan.maxUploadMB * 1024 * 1024;
   const declared = Number(req.headers["content-length"] || 0);
   if (declared && declared > maxBytes) {
@@ -242,7 +242,7 @@ app.post("/api/clip", async (req, res) => {
     });
   }
 
-  const plan = planOf(user.plan);
+  const plan = activePlan(user);
 
   // Monthly video cap (Free tier).
   const usage = getUsage(user);
@@ -257,6 +257,13 @@ app.post("/api/clip", async (req, res) => {
   // per clip because they make more model calls. Out of credits puts the account
   // on hold rather than failing mid-run: the library stays readable, generating
   // stops until the month turns or they top up.
+  if (plan.lapsed) {
+    return res.status(402).json({
+      error: "Your free trial has ended. Pick a plan to keep making clips — everything you already made is still here.",
+      lapsed: true, upgrade: true,
+    });
+  }
+
   const bal = creditBalance(user);
   if (bal.onHold) {
     return res.status(402).json({
@@ -365,7 +372,7 @@ app.post("/api/clip", async (req, res) => {
 // Split out of the route so the podcast autopilot can start a run with no
 // browser involved — nothing here may touch req or res.
 export function startJob(user, o) {
-  const plan = planOf(user.plan);
+  const plan = activePlan(user);
   const cleanUrl = o.url;
   const sourceFile = o.sourceFile || null;
   const uploadId = o.uploadId || null;

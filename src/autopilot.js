@@ -13,7 +13,7 @@ import { randomUUID } from "node:crypto";
 import { fetchPodcastFeed } from "./sources.js";
 import { readJSON, writeJSON } from "./store.js";
 import { planOf } from "./plans.js";
-import { creditBalance } from "./auth.js";
+import { creditBalance, activePlan } from "./auth.js";
 
 // userId -> { id, userId, feedUrl, show, artwork, settings, active,
 //             seen: [episodeUrl], lastCheck, lastError, history: [...] }
@@ -178,12 +178,12 @@ export const autopilotRouter = Router();
 autopilotRouter.get("/autopilot", (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Please log in." });
   const feed = feedFor(req.user.id);
-  res.json({ feed: feed || null, enabled: planOf(req.user.plan).scheduler });
+  res.json({ feed: feed || null, enabled: activePlan(req.user).scheduler });
 });
 
 autopilotRouter.post("/autopilot", async (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Please log in." });
-  const plan = planOf(req.user.plan);
+  const plan = activePlan(req.user);
   if (!plan.scheduler) {
     return res.status(403).json({
       error: "Autopilot is a Creator/Pro feature. Upgrade to let episodes clip themselves.",

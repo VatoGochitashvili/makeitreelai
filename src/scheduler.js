@@ -10,7 +10,7 @@
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { planOf } from "./plans.js";
-import { findUserById } from "./auth.js";
+import { findUserById, activePlan } from "./auth.js";
 import { readJSON, writeJSON } from "./store.js";
 
 const posts = readJSON("schedule.json", []); // { id, userId, clipUrl, title, platform, when, status, createdAt }
@@ -23,7 +23,7 @@ function persist() { writeJSON("schedule.json", () => posts); }
 export async function schedulePost(userId, { clipUrl, title, platform, when }) {
   const user = findUserById(userId);
   if (!user) return { ok: false, error: "Unknown account." };
-  if (!planOf(user.plan).scheduler) return { ok: false, error: "Scheduling needs a Creator or Pro plan." };
+  if (!activePlan(user).scheduler) return { ok: false, error: "Scheduling needs a Creator or Pro plan." };
   if (!PLATFORMS.has(platform)) return { ok: false, error: `Unknown platform "${platform}".` };
   if (!user.connections || !user.connections[platform]) {
     return { ok: false, error: `${platform} isn't connected yet.` };
@@ -53,7 +53,7 @@ schedulerRouter.get("/schedule", (req, res) => {
 
 schedulerRouter.post("/schedule", (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Please log in." });
-  const plan = planOf(req.user.plan);
+  const plan = activePlan(req.user);
   if (!plan.scheduler) {
     return res.status(403).json({
       error: "The auto-post scheduler is a Creator/Pro feature. Upgrade to enable it.",

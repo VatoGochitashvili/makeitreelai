@@ -1321,3 +1321,8 @@ body.studio .tool { max-width: 100%; }
 }
 .pack:hover { border-color: var(--c2); background: rgba(168,85,247,.12); }
 .pack:disabled { opacity: .5; cursor: default; }
+.meta-trial {
+  margin-left: 8px; font-size: 11px; font-weight: 700; letter-spacing: .03em;
+  color: #7ecbe4; background: rgba(126,203,228,.12);
+  border: 1px solid rgba(126,203,228,.32); padding: 3px 8px; border-radius: 999px;
+}

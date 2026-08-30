@@ -270,7 +270,7 @@ catalogueRouter.get("/catalogue", (req, res) => {
   const m = lib[req.user.id];
   const feed = feedFor(req.user.id);
   res.json({
-    enabled: planOf(req.user.plan).scheduler,
+    enabled: activePlan(req.user).scheduler,
     feed: feed ? { show: feed.show, feedUrl: feed.feedUrl } : null,
     stats: catalogueStats(req.user.id),
     scan: m?.scan || null,
@@ -305,7 +305,7 @@ catalogueRouter.get("/catalogue/quote", async (req, res) => {
 
 catalogueRouter.post("/catalogue/scan", (req, res) => {
   if (!req.user) return res.status(401).json({ error: "Please log in." });
-  if (!planOf(req.user.plan).scheduler) {
+  if (!activePlan(req.user).scheduler) {
     return res.status(403).json({ error: "Catalogue mining is a Creator/Pro feature.", upgrade: true });
   }
   const feed = feedFor(req.user.id);

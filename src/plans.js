@@ -8,13 +8,29 @@
 // These were 1200 and 3000, set against Whisper alone. Counting compute, egress,
 // storage and the narration extras, that was a 39% margin — the plans were
 // roughly twice as generous as the business could carry.
+export const TRIAL_DAYS = 7;
+
 export const PLANS = {
+  // Everyone starts here: the Creator product for a week, with enough credits
+  // to judge it properly (two hours of video) rather than a crippled version of
+  // it. A trial that hides the good parts only proves the bad ones.
+  trial: {
+    key: "trial", name: "Creator trial", price: 0, blurb: `${TRIAL_DAYS} days of the full thing.`,
+    clipsPerVideo: 10, credits: 120, maxSourceMinutes: 120,
+    resolution: 1080,
+    captions: true, voiceover: true, scheduler: true, faceTracking: false, workspaces: 1,
+    maxUploadMB: 2048,
+    trial: true,
+  },
+  // Not a plan anyone chooses — where an account lands when the trial ends or a
+  // subscription lapses. The library stays readable; nothing new can be made.
   free: {
-    key: "free", name: "Free", price: 0, blurb: "Kick the tires.",
-    clipsPerVideo: 3, credits: 45, maxSourceMinutes: 45,
+    key: "free", name: "Expired", price: 0, blurb: "Your trial has ended.",
+    clipsPerVideo: 0, credits: 0, maxSourceMinutes: 0,
     resolution: 720,
     captions: true, voiceover: false, scheduler: false, faceTracking: false, workspaces: 1,
     maxUploadMB: 500,
+    lapsed: true,
   },
   creator: {
     key: "creator", name: "Creator", price: 19, blurb: "For serious podcasters.",

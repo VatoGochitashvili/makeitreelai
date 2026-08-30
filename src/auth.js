@@ -7,7 +7,7 @@ import { Router } from "express";
 import {
   randomBytes, randomUUID, scryptSync, timingSafeEqual, createHmac,
 } from "node:crypto";
-import { PLANS, planOf } from "./plans.js";
+import { PLANS, planOf, TRIAL_DAYS } from "./plans.js";
 import { readJSON, writeJSON, DATA_DIR } from "./store.js";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
@@ -112,6 +112,28 @@ export function monthKey(d = new Date()) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 // Returns the user's usage record for the current month, resetting on rollover.
+// The plan an account is actually on right now, not the one written on it.
+// A trial that has run out lapses here, on read, so every caller — the clip
+// route, autopilot, the scheduler, the account page — sees the same answer
+// without each having to remember to check a date.
+export function activePlan(user) {
+  if (user.plan === "trial" && user.trialEndsAt && Date.now() > user.trialEndsAt) {
+    user.plan = "free";
+    persist();
+  }
+  return planOf(user.plan);
+}
+
+export function trialInfo(user) {
+  if (user.plan !== "trial" || !user.trialEndsAt) return null;
+  const msLeft = user.trialEndsAt - Date.now();
+  return {
+    endsAt: user.trialEndsAt,
+    daysLeft: Math.max(0, Math.ceil(msLeft / 86400_000)),
+    hoursLeft: Math.max(0, Math.ceil(msLeft / 3600_000)),
+  };
+}
+
 export function getUsage(user) {
   const m = monthKey();
   if (!user.usage || user.usage.month !== m) user.usage = { month: m, videos: 0, credits: 0 };
@@ -123,8 +145,8 @@ export function getUsage(user) {
 // The monthly allowance resets; bought credits do not. Someone who paid for
 // capacity keeps it — that is what separates a top-up from a penalty.
 export function creditBalance(user) {
+  const plan = activePlan(user);   // lapse first, then count
   const u = getUsage(user);
-  const plan = planOf(user.plan);
   // Rounded down for display so nobody is shown 598.5788889, and so the number
   // never promises a credit that isn't there.
   const allowance = Math.max(0, Math.floor(plan.credits - u.credits));
@@ -140,8 +162,8 @@ export function creditBalance(user) {
 // credits survive to the next month rather than being burned in front of a
 // resource that was about to reset anyway.
 export function spendCredits(user, credits) {
+  const plan = activePlan(user);
   const u = getUsage(user);
-  const plan = planOf(user.plan);
   const fromAllowance = Math.min(credits, Math.max(0, plan.credits - u.credits));
   u.credits += fromAllowance;
   const rest = credits - fromAllowance;
@@ -226,7 +248,13 @@ authRouter.post("/register", (req, res) => {
   if (users.has(email)) return res.status(409).json({ error: "An account with that email already exists." });
 
   const { salt, hash } = hashPassword(password);
-  const user = { id: randomUUID(), name, email, plan, salt, hash, createdAt: Date.now() };
+  // Everyone starts on the trial. The plan they picked at signup is remembered
+  // so the account page can offer it, but nobody is charged before they choose.
+  const user = {
+    id: randomUUID(), name, email, salt, hash, createdAt: Date.now(),
+    plan: "trial", trialEndsAt: Date.now() + TRIAL_DAYS * 86400_000,
+    intendedPlan: VALID_PLANS.has(plan) && plan !== "free" ? plan : "creator",
+  };
   users.set(email, user);
   persist();
   setSession(res, user.id);
@@ -253,7 +281,7 @@ authRouter.post("/logout", (_req, res) => {
 authRouter.get("/me", (req, res) => {
   const user = currentUser(req);
   if (!user) return res.json({ user: null });
-  const plan = planOf(user.plan);
+  const plan = activePlan(user);
   const usage = getUsage(user);
   res.json({
     user: publicUser(user),
@@ -261,6 +289,7 @@ authRouter.get("/me", (req, res) => {
     usage: { videos: usage.videos, ...creditBalance(user) },
     connections: user.connections || {},
     ownershipAck: !!user.ownershipAckAt,
+    trial: trialInfo(user),
   });
 });
 
@@ -352,7 +381,8 @@ authRouter.post("/oauth/:provider", (req, res) => {
   if (!user) {
     // No usable password for social accounts — random, unusable hash.
     const { salt, hash } = hashPassword(randomBytes(24).toString("hex"));
-    user = { id: randomUUID(), name: demo.name, email: demo.email, plan: "free", provider, salt, hash, createdAt: Date.now() };
+    user = { id: randomUUID(), name: demo.name, email: demo.email, provider, salt, hash, createdAt: Date.now(),
+             plan: "trial", trialEndsAt: Date.now() + TRIAL_DAYS * 86400_000, intendedPlan: "creator" };
     users.set(demo.email, user);
     persist();
   }
@@ -365,7 +395,7 @@ authRouter.post("/oauth/:provider", (req, res) => {
 // re-seeded on every boot so they always exist. Remove before production.
 function seedTestUsers() {
   const seeds = [
-    { name: "Free Tester", email: "free@test.com", plan: "free" },
+    { name: "Trial Tester", email: "free@test.com", plan: "trial" },
     { name: "Creator Tester", email: "creator@test.com", plan: "creator" },
     { name: "Pro Tester", email: "pro@test.com", plan: "pro" },
   ];
@@ -373,7 +403,8 @@ function seedTestUsers() {
   for (const s of seeds) {
     if (users.has(s.email)) continue;
     const { salt, hash } = hashPassword("test1234");
-    users.set(s.email, { id: randomUUID(), ...s, salt, hash, createdAt: Date.now() });
+    users.set(s.email, { id: randomUUID(), ...s, salt, hash, createdAt: Date.now(),
+      ...(s.plan === "trial" ? { trialEndsAt: Date.now() + TRIAL_DAYS * 86400_000 } : {}) });
     added = true;
   }
   if (added) persist();

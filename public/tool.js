@@ -877,10 +877,19 @@ function renderMeta() {
   // Credits, in the unit that is actually spent. A credit is a minute of source
   // video, so the number means something without a conversion in your head.
   const low = u.total <= u.planCredits * 0.15;
-  const left = u.onHold
+  const left = p.lapsed
+    ? `<span class="meta-hold">Trial ended — <a href="/account.html">pick a plan</a></span>`
+    : u.onHold
     ? `<span class="meta-hold">Out of credits — <a href="/account.html">top up</a></span>`
     : `<span${low ? ' class="meta-low"' : ''}>${u.total.toLocaleString()} credits left` +
       `${u.topUp ? ` (${u.topUp.toLocaleString()} bought)` : ""}</span>`;
+
+  // A trial that does not say how long is left is a trial people forget to
+  // convert from.
+  const t = ME.trial;
+  const trialTag = t
+    ? `<span class="meta-trial">${t.daysLeft === 1 ? `Last day` : `${t.daysLeft} days left`}</span>`
+    : "";
   toolMeta.innerHTML =
     `<span class="meta-plan">${p.name} plan</span>` +
     `<span class="meta-dot">•</span><span>${p.clipsPerVideo} clips / video</span>` +

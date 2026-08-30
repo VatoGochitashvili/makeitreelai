@@ -202,6 +202,21 @@ anyone who opens devtools.
 The webhook route is mounted **before** `express.json()` because Stripe signs
 the raw bytes.
 
+## Trial, not a free tier
+Everyone signs up onto `trial`: the full Creator product for `TRIAL_DAYS`, with
+120 credits — two hours of video, enough to judge it. No card. A trial that
+hides the good parts only demonstrates the bad ones.
+
+There is no permanent free plan. `free` is the *lapsed* state an account falls
+to when the trial ends: the library stays readable, generating stops with a
+message that says why. `activePlan(user)` does that transition on read, so
+every caller — the clip route, autopilot, the scheduler, the catalogue — sees
+one answer without each remembering to check a date.
+
+The old free tier gave 45 unwatermarked credits a month forever, which is more
+generous than Opus (60 credits, watermarked, deleted after 3 days) and cost
+~$0.43 per signup with nothing pushing anyone to pay.
+
 ## Credits and margin (`src/credits.js`)
 One credit is one minute of source video. Narrated formats cost extra per clip
 because they make extra model calls — `creditsFor()` is the single definition.
