@@ -169,8 +169,8 @@ they'd need the history.
    motion energy, which is enough for someone who walks or leans but knows
    nothing about faces. With two people it follows whoever moved last. Real
    active-speaker detection would pick whoever is *talking*.
-3. **Stripe** — the plans, gating and metering all exist; there is no way to
-   take money. This is the gap between a project and a business.
+3. **Finish billing** — the integration is built and inert. It needs Stripe
+   products, four env vars, a webhook endpoint, and one real test-mode purchase.
 4. **Real platform posting** — replace the simulated publisher in `src/scheduler.js`
    with TikTok/IG/YouTube API calls. This is what makes autopilot actually autopilot.
 5. **A real database** — job state and accounts are JSON files behind a
@@ -178,6 +178,29 @@ they'd need the history.
 
 Clip files are swept after `CLIP_RETENTION_DAYS` (default 30) — see
 `sweepOldClips` in `src/reels.js`.
+
+## Billing (`src/billing.js`)
+Stripe hosted Checkout: the customer pays on Stripe's own page, so no card
+details reach this server and we stay out of PCI scope. Cancelling and card
+changes go to Stripe's billing portal rather than screens we would have to
+build and secure.
+
+Everything is inert until `STRIPE_SECRET_KEY` and the two price ids are set, so
+an unconfigured deployment behaves exactly as before. What still needs doing:
+create the products in Stripe, set the four env vars, point a webhook at
+`/api/billing/webhook`, and run one real test-mode purchase end to end. It has
+been checked against forged webhooks and the unconfigured path; it has never
+taken a real payment.
+
+The plan changes only when the **webhook** says the subscription is live. The
+browser returning from checkout proves nothing — it can be faked, or never
+arrive because someone closed the tab. `POST /api/plan` still lets you switch
+tiers freely while billing is off (useful for trying them), and refuses any paid
+tier the moment `STRIPE_SECRET_KEY` exists, or it would be a free upgrade for
+anyone who opens devtools.
+
+The webhook route is mounted **before** `express.json()` because Stripe signs
+the raw bytes.
 
 ## Spend control
 Transcription is charged by the minute, so minutes are what we meter — not
@@ -207,5 +230,6 @@ for progress that would never arrive.
 
 ## Conventions
 - Keep the pipeline modular (one function per stage) so stages can be swapped.
-- Never let users clip videos they don't own (add an ownership checkbox before launch).
+- Ownership is confirmed once per account before the first run (`ownershipAckAt`),
+  and enforced server-side in `POST /api/clip`.
 - Cap clips per run via `MAX_CLIPS` to control API cost.

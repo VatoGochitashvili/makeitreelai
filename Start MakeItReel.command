@@ -30,6 +30,24 @@ for tool in node ffmpeg yt-dlp; do
   fi
 done
 
+# A stale yt-dlp is the usual cause of "downloads suddenly 403" — check the age,
+# not just that the binary exists.
+if command -v yt-dlp >/dev/null 2>&1; then
+  YTV=$(yt-dlp --version 2>/dev/null)
+  YTDAYS=$(python3 - "$YTV" <<'PYEOF' 2>/dev/null
+import sys, re, datetime
+m = re.match(r"(\d{4})\.(\d{2})\.(\d{2})", sys.argv[1] if len(sys.argv) > 1 else "")
+print((datetime.date.today() - datetime.date(int(m[1]), int(m[2]), int(m[3]))).days if m else -1)
+PYEOF
+)
+  if [ "${YTDAYS:--1}" -gt 30 ]; then
+    printf '  \033[33m!\033[0m yt-dlp  %s is %s days old — YouTube 403s usually mean this\n' "$YTV" "$YTDAYS"
+    printf '            fix with: \033[1mbrew upgrade yt-dlp\033[0m\n'
+  elif [ "${YTDAYS:--1}" -ge 0 ]; then
+    printf '  \033[32m✓\033[0m yt-dlp  %s (%s days old)\n' "$YTV" "$YTDAYS"
+  fi
+fi
+
 if ffmpeg -hide_banner -filters 2>/dev/null | grep -qw subtitles; then
   printf '  \033[32m✓\033[0m captions animated captions supported\n'
 else

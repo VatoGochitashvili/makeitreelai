@@ -257,6 +257,28 @@ async function transcribeFile(file) {
   return { segments: res.segments || [], words: res.words || [] };
 }
 
+// An out-of-date yt-dlp is the single most common cause of sudden 403s on
+// YouTube: they change something, yt-dlp ships a fix within days, and a copy
+// that is weeks old simply stops working. This cost this project several days
+// of debugging once — the download code was fine and the binary was 7 weeks
+// stale. Check at boot and say so loudly.
+export function checkYtdlpAge() {
+  return new Promise((resolve) => {
+    const p = spawn("yt-dlp", ["--version"]);
+    let out = "";
+    p.stdout.on("data", (d) => (out += d.toString()));
+    p.on("error", () => resolve({ ok: false, missing: true }));
+    p.on("close", () => {
+      const v = out.trim();                       // releases are dated: 2026.08.19
+      const m = v.match(/^(\d{4})\.(\d{2})\.(\d{2})/);
+      if (!m) return resolve({ ok: true, version: v || "unknown", days: null });
+      const built = Date.UTC(+m[1], +m[2] - 1, +m[3]);
+      const days = Math.round((Date.now() - built) / 86400_000);
+      resolve({ ok: days <= 30, version: v, days });
+    });
+  });
+}
+
 // Fetch source metadata (title, duration, thumbnail) without downloading the
 // video — used to draw the range selector before generating.
 export function probeVideoMeta(url) {

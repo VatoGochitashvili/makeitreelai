@@ -4,7 +4,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
-import { makeClips, synthSpeech, probeVideoMeta, probeDurationSec, withAiLogger, withJob, Cancelled, FORMATS, killTree } from "./src/pipeline.js";
+import { makeClips, synthSpeech, probeVideoMeta, probeDurationSec, withAiLogger, withJob, Cancelled, FORMATS, killTree, checkYtdlpAge } from "./src/pipeline.js";
 import { createWriteStream } from "node:fs";
 import { authRouter, attachUser, getUsage, bumpVideoUsage, refundVideoUsage, chargeMinutes, findUserById } from "./src/auth.js";
 import { schedulerRouter, schedulePost } from "./src/scheduler.js";
@@ -15,10 +15,15 @@ import { fetchPodcastFeed, normalizeUrl, isDirectMedia } from "./src/sources.js"
 import { workerRouter, workerEnabled, requestDownload, workerOnline } from "./src/worker-queue.js";
 import { backgroundsRouter, loadBackgrounds, findBackground, anyBackground, backgroundsFor } from "./src/backgrounds.js";
 import { autopilotRouter, initAutopilot } from "./src/autopilot.js";
+import { billingRouter, stripeWebhook, billingStatus } from "./src/billing.js";
 import { catalogueRouter } from "./src/catalogue.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+// Stripe signs the raw bytes, so this route has to see them before any JSON
+// parser rewrites the body — mounted ahead of express.json() deliberately.
+app.post("/api/billing/webhook", express.raw({ type: "application/json" }), stripeWebhook);
+
 app.use(express.json());
 // Serve the app. HTML/CSS/JS use "no-cache" so a fresh deploy is picked up
 // immediately (the browser revalidates via ETag and gets a 304 when unchanged),
@@ -38,6 +43,7 @@ app.use("/api", workerRouter);
 app.use("/api", backgroundsRouter);
 app.use("/api", autopilotRouter);
 app.use("/api", catalogueRouter);
+app.use("/api", billingRouter);
 await loadBackgrounds();
 
 // finished clips are served from here
@@ -225,6 +231,14 @@ app.post("/api/clip", async (req, res) => {
   }
   if (!process.env.OPENAI_API_KEY) {
     return res.status(500).json({ error: "Server is missing OPENAI_API_KEY. Add it to your .env file." });
+  }
+
+  // Confirmed once, per account. The site says we check; this is the check.
+  if (!user.ownershipAckAt) {
+    return res.status(403).json({
+      error: "Confirm you own this video or have the rights to clip it before we start.",
+      needsOwnership: true,
+    });
   }
 
   const plan = planOf(user.plan);
@@ -479,6 +493,16 @@ initAutopilot({ startJob, findUser: findUserById, schedulePost });
 // Clips are the biggest thing on disk and nothing was reclaiming them.
 startRetentionSweep((msg) => console.log("  " + msg));
 
+// Downloads fail silently and confusingly when yt-dlp goes stale, so say it at
+// boot rather than leaving someone to debug their own network for a week.
+let ytdlpStatus = { ok: true, version: "checking…", days: null };
+checkYtdlpAge().then((r) => {
+  ytdlpStatus = r;
+  if (r.missing) console.log("  \x1b[31m✗\x1b[0m yt-dlp not found on PATH — links cannot be downloaded (brew install yt-dlp)");
+  else if (!r.ok) console.log(`  \x1b[33m!\x1b[0m yt-dlp ${r.version} is ${r.days} days old — YouTube 403s usually mean this. Run: brew upgrade yt-dlp`);
+  else console.log(`  \x1b[32m✓\x1b[0m yt-dlp ${r.version}${r.days != null ? ` (${r.days} days old)` : ""}`);
+}).catch(() => {});
+
 
 app.get("/api/preview", async (req, res) => {
   const url = String(req.query.url || "");
@@ -592,6 +616,8 @@ app.get("/api/podcast", async (req, res) => {
 // cached page is obvious instead of looking like a fresh bug.
 const BUILD = (process.env.RENDER_GIT_COMMIT || "dev").slice(0, 7);
 const STARTED = new Date().toISOString();
+app.get("/api/ytdlp", (req, res) => res.json(ytdlpStatus));
+
 app.get("/api/version", (_req, res) => res.json({ build: BUILD, started: STARTED }));
 
 // Is a download helper connected? (drives the UI hint)

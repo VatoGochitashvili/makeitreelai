@@ -338,8 +338,31 @@ function renderPlanCards() {
 }
 
 async function switchPlan(plan) {
+  // A paid plan means checkout; the account only changes when Stripe says the
+  // subscription is real, never because this page asked nicely.
+  const billing = await fetch("/api/billing/status").then((r) => r.json()).catch(() => ({ ready: false }));
+  if (billing.ready && plan !== "free") {
+    const r = await fetch("/api/billing/checkout", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ plan }),
+    });
+    const d = await r.json();
+    if (d.url) { location.href = d.url; return; }
+    alert(d.error || "Couldn't start checkout.");
+    return;
+  }
   const r = await fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ plan }) });
-  if (r.ok) load(); // re-render with new plan
+  const d = await r.json().catch(() => ({}));
+  if (r.ok) load();
+  else alert(d.error || "Couldn't change plan.");
+}
+
+// Cancelling and card changes happen in Stripe's portal, so we never build
+// those screens or hold the data.
+async function openBillingPortal() {
+  const r = await fetch("/api/billing/portal", { method: "POST" });
+  const d = await r.json();
+  if (d.url) location.href = d.url; else alert(d.error || "No subscription to manage yet.");
 }
 
 // tabs

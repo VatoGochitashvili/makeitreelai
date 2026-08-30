@@ -164,7 +164,14 @@ async function resumeRunningJob() {
     if (!jobs || !jobs.length) return;
     const j = jobs[0];
     currentJobId = j.id;
-    panel.classList.add("show");
+    if (ME && ME.user && !ME.ownershipAck) {
+    if (!(await confirmOwnership())) {
+      toolHint("We need that confirmation before we can start.");
+      return;
+    }
+  }
+
+  panel.classList.add("show");
     $("errBox").style.display = "none";
     $("progWrap").style.display = "block";
     $("stopBtn").style.display = "inline-block";
@@ -1324,6 +1331,27 @@ $("goPodcast").addEventListener("click", () => start(false)); // episode URL is 
 
 // The settings panel is long — offer the action at the bottom as well.
 $("goBottom").addEventListener("click", () => start(activeSource === "file"));
+
+// ---------- ownership ----------
+// Asked once, when someone first tries to generate. A dialog they have to read
+// beats a pre-ticked box they never see.
+async function confirmOwnership() {
+  const ok = confirm(
+    "Do you own this video, or have the rights to clip it?\n\n" +
+    "Clipping someone else's video without permission is their copyright, and " +
+    "platforms do match it — a strike lands on your account, not ours.\n\n" +
+    "Press OK to confirm. We'll only ask once.");
+  if (!ok) return false;
+  try {
+    const r = await fetch("/api/ownership", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ confirm: true }),
+    });
+    if (!r.ok) return false;
+    if (ME) ME.ownershipAck = true;
+    return true;
+  } catch (_) { return false; }
+}
 
 document.getElementById("stopBtn").addEventListener("click", async () => {
   if (!currentJobId) return;

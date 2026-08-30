@@ -136,6 +136,24 @@ export function bumpVideoUsage(user) {
 // Source minutes are what actually cost money, so they are what we meter.
 // Charged from the known duration where we have one, and reconciled against the
 // real figure once the transcript tells us the truth.
+// The site promises an ownership check before launch. Recorded once per
+// account rather than nagged on every run — it is a commitment, not a warning
+// label, and repeating it just trains people to click past it.
+export function ackOwnership(user) {
+  user.ownershipAckAt = Date.now();
+  persist();
+  return user;
+}
+
+// Only the Stripe webhook calls this — the plan follows the subscription, never
+// a request from the browser.
+export function setPlan(user, plan, stripeCustomerId) {
+  if (PLANS[plan]) user.plan = plan;
+  if (stripeCustomerId) user.stripeCustomerId = stripeCustomerId;
+  persist();
+  return user;
+}
+
 export function chargeMinutes(user, minutes) {
   const u = getUsage(user);
   u.minutes = Math.max(0, u.minutes + (Number(minutes) || 0));
@@ -202,6 +220,7 @@ authRouter.get("/me", (req, res) => {
       minutesLeft: Math.max(0, Math.round(plan.minutesPerMonth - usage.minutes)),
     },
     connections: user.connections || {},
+    ownershipAck: !!user.ownershipAckAt,
   });
 });
 
@@ -241,6 +260,14 @@ authRouter.post("/account", (req, res) => {
 });
 
 // Change password.
+authRouter.post("/ownership", (req, res) => {
+  const user = currentUser(req);
+  if (!user) return res.status(401).json({ error: "Please log in." });
+  if (req.body?.confirm !== true) return res.status(400).json({ error: "Confirmation required." });
+  ackOwnership(user);
+  res.json({ ok: true });
+});
+
 authRouter.post("/password", (req, res) => {
   const user = currentUser(req);
   if (!user) return res.status(401).json({ error: "Please log in first." });
@@ -314,11 +341,20 @@ function seedTestUsers() {
 seedTestUsers();
 
 // Change the selected plan (no billing — just records the choice).
+// Switching plans without paying. This existed so the tiers could be tried
+// before billing was built — with Stripe configured it would be a free upgrade
+// for anyone who could open devtools, so it only survives while billing is off,
+// and it can never be used to reach a paid tier once it is on.
 authRouter.post("/plan", (req, res) => {
   const user = currentUser(req);
   if (!user) return res.status(401).json({ error: "Please log in first." });
   const plan = (req.body || {}).plan;
   if (!VALID_PLANS.has(plan)) return res.status(400).json({ error: "Unknown plan." });
+
+  const billingLive = !!process.env.STRIPE_SECRET_KEY;
+  if (billingLive && PLANS[plan]?.price > 0) {
+    return res.status(402).json({ error: "Paid plans go through checkout.", checkout: true });
+  }
   user.plan = plan;
   persist();
   res.json({ user: publicUser(user) });
