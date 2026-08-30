@@ -25,6 +25,13 @@ export const RATE = {
 // unit — hence one number rather than false precision.
 export const INFRA_PER_MIN = 0.0025;
 
+// Stripe takes its cut before you see any of it, and on a $19 subscription the
+// flat 30c is a bigger deal than the percentage. Omitting this made every
+// margin here look ~4 points better than it is.
+export const STRIPE_PCT = 0.029;
+export const STRIPE_FLAT = 0.30;
+export const paymentFee = (price) => price > 0 ? price * STRIPE_PCT + STRIPE_FLAT : 0;
+
 // The margin the business is run at. Change this and every plan's allowance
 // moves with it; that is the point of having it here.
 export const TARGET_MARGIN = 0.70;
@@ -60,5 +67,21 @@ export function economics(price, credits) {
     worstCaseCost: +cost.toFixed(2),
     marginPct: price > 0 ? Math.round((1 - cost / price) * 100) : null,
     costPerCredit: +costPerCredit().toFixed(5),
+  };
+}
+
+// What one subscriber is actually worth, which is not the worst case: almost
+// nobody spends every credit. `used` is the fraction of the allowance they get
+// through in a month.
+export function userMargin(price, credits, used = 1, fixedPerUser = 0) {
+  const ai = credits * used * costPerCredit();
+  const fee = paymentFee(price);
+  const cost = ai + fee + fixedPerUser;
+  return {
+    used, revenue: price,
+    aiCost: +ai.toFixed(2), paymentFee: +fee.toFixed(2), fixed: +fixedPerUser.toFixed(2),
+    totalCost: +cost.toFixed(2),
+    profit: +(price - cost).toFixed(2),
+    marginPct: Math.round((1 - cost / price) * 100),
   };
 }

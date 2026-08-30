@@ -216,6 +216,12 @@ compute, egress, storage and the narration extras are included the real figure
 is ~$0.0096 a credit, which made those plans a 39% margin business. They are
 600 and 1500 credits now, at 70%.
 
+`userMargin()` answers the question the allowance number does not: what one
+subscriber is worth. The plan allowance is sized to the *worst* case — someone
+who spends every credit — which is 64-67% once Stripe's cut is included. A
+realistic subscriber uses well under half and lands in the low 80s. Payment
+fees matter more than they look on a $19 plan: the flat 30c is most of it.
+
 Running out puts the account **on hold**: the library stays readable, generating
 stops, autopilot says so in its log rather than failing quietly. The monthly
 allowance resets; bought credits never expire and are spent only after the
