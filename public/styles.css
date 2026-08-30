@@ -1311,3 +1311,13 @@ body.studio .tool { max-width: 100%; }
 .rm-row b { flex: 0 0 168px; font-size: 14px; color: var(--text); font-weight: 600; }
 .rm-row span { flex: 1; min-width: 220px; font-size: 13.5px; color: var(--muted); line-height: 1.55; }
 .meta-low { color: #f5b971; font-weight: 600; }
+.meta-hold { color: #f5b971; font-weight: 700; }
+.meta-hold a { color: inherit; }
+.packs { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.pack {
+  font-size: 12.5px; font-weight: 600; padding: 7px 12px; border-radius: 8px; cursor: pointer;
+  color: var(--text); background: rgba(255,255,255,.05); border: 1px solid var(--line);
+  font-family: inherit; transition: border-color var(--t), background var(--t);
+}
+.pack:hover { border-color: var(--c2); background: rgba(168,85,247,.12); }
+.pack:disabled { opacity: .5; cursor: default; }

@@ -6,10 +6,11 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { makeClips, synthSpeech, probeVideoMeta, probeDurationSec, withAiLogger, withJob, Cancelled, FORMATS, killTree, checkYtdlpAge } from "./src/pipeline.js";
 import { createWriteStream } from "node:fs";
-import { authRouter, attachUser, getUsage, bumpVideoUsage, refundVideoUsage, chargeMinutes, findUserById } from "./src/auth.js";
+import { authRouter, attachUser, getUsage, bumpVideoUsage, refundVideoUsage, creditBalance, spendCredits, findUserById } from "./src/auth.js";
 import { schedulerRouter, schedulePost } from "./src/scheduler.js";
 import { reelsRouter, addReels, startRetentionSweep, retentionDays } from "./src/reels.js";
-import { planOf, VOICE_IDS, fmtHours } from "./src/plans.js";
+import { planOf, VOICE_IDS, fmtHours, CREDIT_PACKS } from "./src/plans.js";
+import { creditsFor, economics } from "./src/credits.js";
 import { DATA_DIR, readJSON, writeJSON } from "./src/store.js";
 import { fetchPodcastFeed, normalizeUrl, isDirectMedia } from "./src/sources.js";
 import { workerRouter, workerEnabled, requestDownload, workerOnline } from "./src/worker-queue.js";
@@ -252,19 +253,19 @@ app.post("/api/clip", async (req, res) => {
     });
   }
 
-  // Monthly minute budget. Transcription is charged by the minute, so minutes
-  // are what we meter — a plan measured in "videos" prices a 3-minute clip the
-  // same as a 3-hour show, which is how an unlimited tier quietly loses money.
-  const left = plan.minutesPerMonth - usage.minutes;
-  if (left <= 0) {
-    return res.status(403).json({
-      error: `You've used your ${fmtHours(plan.minutesPerMonth)} of video this month on the ${plan.name} plan. ` +
-             `It resets on the 1st, or you can upgrade now.`,
-      upgrade: true,
+  // Credits. One credit is a minute of source video; narrated formats cost more
+  // per clip because they make more model calls. Out of credits puts the account
+  // on hold rather than failing mid-run: the library stays readable, generating
+  // stops until the month turns or they top up.
+  const bal = creditBalance(user);
+  if (bal.onHold) {
+    return res.status(402).json({
+      error: `You're out of credits. They reset on the 1st, or you can top up now and keep going.`,
+      onHold: true, topUp: true,
     });
   }
 
-  // Where the length is already known, refuse before spending rather than after.
+  // Refuse before spending, wherever the length is already known.
   let knownMinutes = null;
   if (uploadId && uploads.get(uploadId)?.duration) knownMinutes = uploads.get(uploadId).duration / 60;
   else if (previewCache.get(cleanUrl)?.duration) knownMinutes = previewCache.get(cleanUrl).duration / 60;
@@ -277,11 +278,13 @@ app.post("/api/clip", async (req, res) => {
         upgrade: true,
       });
     }
-    if (knownMinutes > left) {
-      return res.status(403).json({
-        error: `That video is ${Math.round(knownMinutes)} minutes and you have ${Math.round(left)} left this month. ` +
-               `Your allowance resets on the 1st.`,
-        upgrade: true,
+    const need = creditsFor({ minutes: knownMinutes, clips: clipsReq || plan.clipsPerVideo,
+                              voiceover: !!voiceoverReq, format: format || "clip" });
+    if (need > bal.total) {
+      return res.status(402).json({
+        error: `That run needs about ${Math.ceil(need)} credits and you have ${bal.total}. ` +
+               `Top up, or try a shorter video.`,
+        topUp: true, need: Math.ceil(need), have: bal.total,
       });
     }
   }
@@ -439,12 +442,15 @@ export function startJob(user, o) {
         format: c.format || "clip", script: c.script || null,
       });
     }
-    // Meter what was actually processed. Charged here rather than up front
-    // because a link's advertised duration is a guess until we have the audio.
+    // Charge here rather than up front: a link's advertised duration is a guess
+    // until we have the audio, and the clip count is not final until the model
+    // has chosen.
     if (sourceSeconds) {
-      chargeMinutes(user, sourceSeconds / 60);
-      console.log(`  [${id.slice(0, 6)}] charged ${(sourceSeconds / 60).toFixed(1)} min ` +
-                  `(${getUsage(user).minutes.toFixed(0)}/${planOf(user.plan).minutesPerMonth} this month)`);
+      const spent = creditsFor({ minutes: sourceSeconds / 60, clips: published.length,
+                                 voiceover: o.voiceover, format: o.format });
+      const after = spendCredits(user, spent);
+      console.log(`  [${id.slice(0, 6)}] ${spent} credits ` +
+                  `(${after.total} left: ${after.allowance} allowance + ${after.topUp} bought)`);
     }
     job.clips = published;
     job.status = "done";

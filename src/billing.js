@@ -10,8 +10,8 @@
 
 import { Router } from "express";
 import Stripe from "stripe";
-import { PLANS, planOf } from "./plans.js";
-import { findUserById, setPlan } from "./auth.js";
+import { PLANS, planOf, CREDIT_PACKS } from "./plans.js";
+import { findUserById, setPlan, addTopUp } from "./auth.js";
 
 const KEY = process.env.STRIPE_SECRET_KEY || "";
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
@@ -19,6 +19,13 @@ const SITE = (process.env.SITE_URL || "http://localhost:3000").replace(/\/$/, ""
 
 // Price ids come from the Stripe dashboard; one per paid plan.
 const PRICE = { creator: process.env.STRIPE_PRICE_CREATOR || "", pro: process.env.STRIPE_PRICE_PRO || "" };
+// One-off credit packs. Separate ids because these are payments, not
+// subscriptions — buying capacity should never change what someone pays monthly.
+const PACK_PRICE = {
+  small: process.env.STRIPE_PRICE_PACK_SMALL || "",
+  medium: process.env.STRIPE_PRICE_PACK_MEDIUM || "",
+  large: process.env.STRIPE_PRICE_PACK_LARGE || "",
+};
 
 let stripe = null;
 if (KEY) stripe = new Stripe(KEY);
@@ -72,6 +79,37 @@ billingRouter.post("/billing/checkout", async (req, res) => {
   }
 });
 
+// Buying credits. A one-off payment, so the plan is untouched and the credits
+// land on the account when the webhook confirms the money arrived.
+billingRouter.get("/billing/packs", (req, res) => {
+  res.json({ packs: CREDIT_PACKS.map((p) => ({ ...p, available: !!PACK_PRICE[p.id] })) });
+});
+
+billingRouter.post("/billing/topup", async (req, res) => {
+  if (!req.user) return res.status(401).json({ error: "Please log in." });
+  const pack = CREDIT_PACKS.find((p) => p.id === req.body?.pack);
+  if (!pack) return res.status(400).json({ error: "Pick a credit pack." });
+  if (!stripe || !PACK_PRICE[pack.id]) {
+    return res.status(503).json({ error: "Credit packs aren't set up on this server yet." });
+  }
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      line_items: [{ price: PACK_PRICE[pack.id], quantity: 1 }],
+      customer: req.user.stripeCustomerId || undefined,
+      customer_email: req.user.stripeCustomerId ? undefined : req.user.email,
+      client_reference_id: req.user.id,
+      metadata: { userId: req.user.id, kind: "topup", credits: String(pack.credits) },
+      success_url: `${SITE}/account.html?topped_up=${pack.credits}`,
+      cancel_url: `${SITE}/account.html`,
+    });
+    res.json({ url: session.url });
+  } catch (e) {
+    console.error("stripe topup failed:", e.message);
+    res.status(502).json({ error: "Couldn't start checkout." });
+  }
+});
+
 // Cancelling and changing card details happen in Stripe's own portal, so we
 // never build screens for them and never hold the data.
 billingRouter.post("/billing/portal", async (req, res) => {
@@ -113,9 +151,21 @@ export function stripeWebhook(req, res) {
   try {
     const o = event.data.object;
     switch (event.type) {
-      case "checkout.session.completed":
-        apply(o.metadata?.userId || o.client_reference_id, o.metadata?.plan || "creator", o.customer);
+      case "checkout.session.completed": {
+        const userId = o.metadata?.userId || o.client_reference_id;
+        if (o.metadata?.kind === "topup") {
+          // Credits, not a plan change — and only once the money is confirmed.
+          const user = findUserById(userId);
+          const credits = Number(o.metadata?.credits || 0);
+          if (user && credits > 0) {
+            addTopUp(user, credits);
+            console.log(`  billing: ${user.email} +${credits} credits`);
+          }
+        } else {
+          apply(userId, o.metadata?.plan || "creator", o.customer);
+        }
         break;
+      }
       case "customer.subscription.updated": {
         // Downgrade the moment it stops being paid for, not at some later sweep.
         const live = ["active", "trialing"].includes(o.status);

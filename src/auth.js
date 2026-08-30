@@ -114,9 +114,53 @@ export function monthKey(d = new Date()) {
 // Returns the user's usage record for the current month, resetting on rollover.
 export function getUsage(user) {
   const m = monthKey();
-  if (!user.usage || user.usage.month !== m) user.usage = { month: m, videos: 0, minutes: 0 };
-  if (user.usage.minutes == null) user.usage.minutes = 0;   // accounts from before minutes existed
+  if (!user.usage || user.usage.month !== m) user.usage = { month: m, videos: 0, credits: 0 };
+  if (user.usage.credits == null) user.usage.credits = user.usage.minutes || 0;  // pre-credits accounts
+  if (user.topUpCredits == null) user.topUpCredits = 0;
   return user.usage;
+}
+
+// The monthly allowance resets; bought credits do not. Someone who paid for
+// capacity keeps it — that is what separates a top-up from a penalty.
+export function creditBalance(user) {
+  const u = getUsage(user);
+  const plan = planOf(user.plan);
+  // Rounded down for display so nobody is shown 598.5788889, and so the number
+  // never promises a credit that isn't there.
+  const allowance = Math.max(0, Math.floor(plan.credits - u.credits));
+  const topUp = Math.floor(user.topUpCredits || 0);
+  return {
+    allowance, topUp, total: allowance + topUp,
+    used: Math.ceil(u.credits), planCredits: plan.credits,
+    onHold: allowance + topUp <= 0,
+  };
+}
+
+// Spend the monthly allowance first, then anything bought — so purchased
+// credits survive to the next month rather than being burned in front of a
+// resource that was about to reset anyway.
+export function spendCredits(user, credits) {
+  const u = getUsage(user);
+  const plan = planOf(user.plan);
+  const fromAllowance = Math.min(credits, Math.max(0, plan.credits - u.credits));
+  u.credits += fromAllowance;
+  const rest = credits - fromAllowance;
+  if (rest > 0) user.topUpCredits = Math.max(0, (user.topUpCredits || 0) - rest);
+  persist();
+  return creditBalance(user);
+}
+
+export function refundCredits(user, credits) {
+  const u = getUsage(user);
+  u.credits = Math.max(0, u.credits - credits);
+  persist();
+  return creditBalance(user);
+}
+
+export function addTopUp(user, credits) {
+  user.topUpCredits = (user.topUpCredits || 0) + credits;
+  persist();
+  return creditBalance(user);
 }
 // Cancelling a run gives the monthly allowance back.
 export function refundVideoUsage(user) {
@@ -214,11 +258,7 @@ authRouter.get("/me", (req, res) => {
   res.json({
     user: publicUser(user),
     plan,
-    usage: {
-      videos: usage.videos, videosPerMonth: plan.videosPerMonth,
-      minutes: Math.round(usage.minutes), minutesPerMonth: plan.minutesPerMonth,
-      minutesLeft: Math.max(0, Math.round(plan.minutesPerMonth - usage.minutes)),
-    },
+    usage: { videos: usage.videos, ...creditBalance(user) },
     connections: user.connections || {},
     ownershipAck: !!user.ownershipAckAt,
   });

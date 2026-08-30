@@ -202,20 +202,25 @@ anyone who opens devtools.
 The webhook route is mounted **before** `express.json()` because Stripe signs
 the raw bytes.
 
-## Spend control
-Transcription is charged by the minute, so minutes are what we meter — not
-videos. A "videos per month" limit prices a 3-minute clip the same as a 3-hour
-show, which is how the old unlimited Creator tier quietly lost money: a customer
-running a hundred 2-hour podcasts cost ~$73 and paid $19.
+## Credits and margin (`src/credits.js`)
+One credit is one minute of source video. Narrated formats cost extra per clip
+because they make extra model calls — `creditsFor()` is the single definition.
 
-`minutesPerMonth` is the budget, `maxSourceMinutes` stops one enormous file
-eating it in a single run. Length is checked up front where it is already known
-(uploads are probed at upload time, links from the preview cache), and the real
-figure is charged after the run from the audio we actually transcribed.
+`src/credits.js` holds the whole cost model: provider rates, an infrastructure
+allocation, and `TARGET_MARGIN`. Plan allowances are derived from it, so a plan
+can never promise more than the margin allows. Change the margin and the
+numbers move together.
 
-At the ceiling each plan spends ~38% of its revenue on transcription. If a
-plan's price or the Whisper rate changes, `MINUTE_COST` in `src/plans.js` is
-there to redo the sum with.
+The first version of this counted Whisper alone and set 1200/3000 minutes. Once
+compute, egress, storage and the narration extras are included the real figure
+is ~$0.0096 a credit, which made those plans a 39% margin business. They are
+600 and 1500 credits now, at 70%.
+
+Running out puts the account **on hold**: the library stays readable, generating
+stops, autopilot says so in its log rather than failing quietly. The monthly
+allowance resets; bought credits never expire and are spent only after the
+allowance is gone.
+
 
 ## Jobs and the queue
 `MAX_CONCURRENT_JOBS` (default 1) caps parallel renders. ffmpeg and Whisper will

@@ -13,7 +13,7 @@ import { randomUUID } from "node:crypto";
 import { fetchPodcastFeed } from "./sources.js";
 import { readJSON, writeJSON } from "./store.js";
 import { planOf } from "./plans.js";
-import { getUsage } from "./auth.js";
+import { creditBalance } from "./auth.js";
 
 // userId -> { id, userId, feedUrl, show, artwork, settings, active,
 //             seen: [episodeUrl], lastCheck, lastError, history: [...] }
@@ -90,10 +90,12 @@ export async function checkFeed(feed) {
   feed.seen.unshift(idOf(ep));
   feed.seen.length = Math.min(feed.seen.length, 200);
 
-  const plan = planOf(user.plan);
-  const usage = getUsage(user);
-  if (plan.videosPerMonth !== -1 && usage.videos >= plan.videosPerMonth) {
-    note(feed, `New episode "${ep.title}" — but this month's quota is used up.`, { kind: "error" });
+  // An account with no credits must be told, not left wondering why episodes
+  // stopped appearing. Autopilot failing quietly is worse than not running.
+  const bal = creditBalance(user);
+  if (bal.onHold) {
+    note(feed, `New episode "${ep.title}" — but you're out of credits. Top up and it'll be picked up on the next check.`,
+         { kind: "error" });
     return;
   }
 

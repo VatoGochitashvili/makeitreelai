@@ -874,11 +874,13 @@ urlInput.addEventListener("input", () => {
 
 function renderMeta() {
   const p = ME.plan, u = ME.usage;
-  // "Unlimited videos" was never true — it was an unmetered tab. Show the real
-  // budget, in the unit that is actually spent.
-  const hrs = (m) => (m % 60 === 0 ? `${m / 60}h` : `${(m / 60).toFixed(1)}h`);
-  const low = u.minutesLeft <= u.minutesPerMonth * 0.1;
-  const left = `<span${low ? ' class="meta-low"' : ''}>${hrs(u.minutesLeft)} of ${hrs(u.minutesPerMonth)} left this month</span>`;
+  // Credits, in the unit that is actually spent. A credit is a minute of source
+  // video, so the number means something without a conversion in your head.
+  const low = u.total <= u.planCredits * 0.15;
+  const left = u.onHold
+    ? `<span class="meta-hold">Out of credits — <a href="/account.html">top up</a></span>`
+    : `<span${low ? ' class="meta-low"' : ''}>${u.total.toLocaleString()} credits left` +
+      `${u.topUp ? ` (${u.topUp.toLocaleString()} bought)` : ""}</span>`;
   toolMeta.innerHTML =
     `<span class="meta-plan">${p.name} plan</span>` +
     `<span class="meta-dot">•</span><span>${p.clipsPerVideo} clips / video</span>` +
