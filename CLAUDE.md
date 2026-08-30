@@ -228,6 +228,17 @@ child processes) can't be serialised, so on boot anything left "running" is
 marked `MIR-RESTART` — a deploy used to kill a run and leave the page waiting
 for progress that would never arrive.
 
+## Before committing HTML changes
+`npm run check` verifies every page's block tags balance. It exists because a
+regex rewrite of the nav once matched past its intended end and swallowed a
+page's `</nav>`, its `<header class="hero">` and a whole reel-wall column —
+across six files. Every page still returned 200 and `node --check` was happy,
+because malformed HTML is not a syntax error: the browser silently reparents
+the wreckage and the layout collapses.
+
+Rewriting a block of markup with `[\s\S]*?` is the specific trap. Prefer
+slicing between located indices, and run the check after.
+
 ## Conventions
 - Keep the pipeline modular (one function per stage) so stages can be swapped.
 - Ownership is confirmed once per account before the first run (`ownershipAckAt`),
