@@ -45,7 +45,7 @@
         <div class="card-h">Current plan</div>
         <div class="plan-now"><span class="plan-badge" id="planBadge">—</span><span class="plan-price" id="planPrice"></span></div>
         <div class="usage">
-          <div class="usage-row"><span>Videos this month</span><strong id="uVideos">—</strong></div>
+          <div class="usage-row"><span>Video processed this month</span><strong id="uVideos">—</strong></div>
           <div class="bar"><div class="bar-fill" id="uBar"></div></div>
           <div class="usage-row"><span>Clips per video</span><strong id="uClips">—</strong></div>
           <div class="usage-row"><span>Export quality</span><strong id="uRes">—</strong></div>
@@ -198,9 +198,13 @@ function render() {
   $("planBadge").textContent = plan.name;
   $("planPrice").textContent = PLAN_META[plan.key].price;
 
-  const unlimited = usage.videosPerMonth === -1;
-  $("uVideos").textContent = unlimited ? `${usage.videos} used · Unlimited` : `${usage.videos} / ${usage.videosPerMonth}`;
-  $("uBar").style.width = unlimited ? "18%" : Math.min(100, (usage.videos / usage.videosPerMonth) * 100) + "%";
+  // Minutes, not videos — that is what is actually metered and enforced, and
+  // this row said "Unlimited" long after it stopped being true.
+  const hrs = (m) => (m % 60 === 0 ? `${m / 60}h` : `${(m / 60).toFixed(1)}h`);
+  const pct = Math.min(100, (usage.minutes / usage.minutesPerMonth) * 100);
+  $("uVideos").textContent = `${hrs(usage.minutes)} of ${hrs(usage.minutesPerMonth)} used`;
+  $("uBar").style.width = Math.max(2, pct) + "%";
+  $("uBar").style.background = pct > 90 ? "#f5b971" : "";
   $("uClips").textContent = plan.clipsPerVideo + " clips";
   $("uRes").textContent = plan.resolution + "p";
 
@@ -320,7 +324,7 @@ function renderPlanCards() {
     const isCur = k === cur;
     const feats = {
       free: ["3 clips / video", "2 videos / month", "720p exports"],
-      creator: ["10 clips / video", "Unlimited videos", "1080p exports", "AI voiceover", "Auto-post scheduler"],
+      creator: ["10 clips / video", "20 hours of video a month", "1080p exports", "AI voiceover", "Auto-post scheduler"],
       pro: ["Everything in Creator", "Face-tracking reframe", "3 workspaces", "Priority rendering"],
     }[k];
     return `<div class="plan ${k === "creator" ? "pop" : ""}">

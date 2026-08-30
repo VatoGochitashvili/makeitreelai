@@ -67,120 +67,6 @@
   <!-- Autopilot: the loop a clip tool doesn't close. Connect a feed once and
        episodes clip and queue themselves with nobody at the keyboard. -->
 
-  <!-- The back catalogue: the part no one-file-at-a-time tool can reach. -->
-  <section class="cat-card" id="catCard" style="display:none">
-    <div class="auto-head">
-      <div>
-        <span class="eyebrow">Back catalogue</span>
-        <h2>Mine everything you've already said</h2>
-      </div>
-      <span class="auto-state" id="catStat"></span>
-    </div>
-
-    <p class="auto-blurb" id="catBlurb">
-      Every other tool starts from the file you upload today. This reads your whole
-      history, finds what your show keeps coming back to, and pulls the best
-      answers you've ever given — from across every episode.
-    </p>
-
-    <div class="cat-actions">
-      <button class="btn sm" id="catScan">Scan my back catalogue</button>
-      <button class="btn ghost sm" id="catThemes">Find my themes</button>
-    </div>
-    <div class="auto-err" id="catErr"></div>
-
-    <div class="cat-progress" id="catProgress" style="display:none">
-      <div class="cat-bar"><div class="cat-fill" id="catFill"></div></div>
-      <div class="cat-prog-txt" id="catProgTxt"></div>
-    </div>
-
-    <div class="cat-themes" id="catThemeList"></div>
-
-    <div class="cat-search">
-      <input id="catQuery" type="text" placeholder="Or search it yourself — “burnout”, “pricing”, “how they started”…">
-      <button class="btn sm" id="catGo">Find the best moments</button>
-      <button class="btn ghost sm" id="catMakeAll" style="display:none"></button>
-    </div>
-
-    <div class="cat-results" id="catResults"></div>
-  </section>
-
-  <section class="auto-card" id="autoCard" style="display:none">
-    <div class="auto-head">
-      <div>
-        <span class="eyebrow">Autopilot</span>
-        <h2 id="autoTitle">Let your episodes clip themselves</h2>
-      </div>
-      <span class="auto-state" id="autoState"></span>
-    </div>
-
-    <!-- not connected yet -->
-    <div id="autoSetup">
-      <p class="auto-blurb">
-        Connect your show's RSS feed. Every new episode gets clipped and queued
-        to post automatically — you don't have to open this page again.
-      </p>
-      <form class="auto-form" id="autoForm">
-        <input type="url" id="autoFeed" placeholder="https://feeds.example.com/your-show" required>
-        <button class="btn" type="submit">Connect feed</button>
-      </form>
-      <div class="auto-err" id="autoErr"></div>
-    </div>
-
-    <!-- connected -->
-    <div id="autoLive" style="display:none">
-      <div class="auto-show">
-        <img id="autoArt" alt="" width="56" height="56">
-        <div>
-          <div class="auto-name" id="autoShow"></div>
-          <div class="auto-sub" id="autoLast"></div>
-        </div>
-      </div>
-
-      <div class="auto-settings">
-        <div class="set-field">
-          <label for="autoClips">Clips per episode</label>
-          <select id="autoClips" class="voice-select"></select>
-        </div>
-        <div class="set-field">
-          <label for="autoLength">Clip length</label>
-          <select id="autoLength" class="voice-select">
-            <option value="auto">Auto — varied</option>
-            <option value="short">Short (15–30s)</option>
-            <option value="medium">Medium (30–45s)</option>
-            <option value="long">Long (45–60s)</option>
-          </select>
-        </div>
-        <div class="set-field">
-          <label for="autoHour">Post at</label>
-          <select id="autoHour" class="voice-select"></select>
-        </div>
-      </div>
-
-      <label class="switch" id="autoPostSwitch">
-        <input type="checkbox" id="autoPost">
-        <span class="track"></span>
-        <span class="switch-label">📅 Queue the clips to post, one a day</span>
-      </label>
-
-      <div class="auto-plats" id="autoPlats">
-        <label><input type="checkbox" value="tiktok"> TikTok</label>
-        <label><input type="checkbox" value="instagram"> Instagram</label>
-        <label><input type="checkbox" value="youtube"> YouTube</label>
-      </div>
-
-      <div class="auto-actions">
-        <button class="btn sm" id="autoSave">Save</button>
-        <button class="btn ghost sm" id="autoCheck">Check now</button>
-        <button class="btn ghost sm" id="autoPause"></button>
-        <button class="btn ghost sm danger" id="autoDrop">Disconnect</button>
-      </div>
-      <div class="auto-err" id="autoErr2"></div>
-
-      <div class="auto-log" id="autoLog"></div>
-    </div>
-  </section>
-
   <section id="try">
   <div class="wrap">
     <div class="section-head" style="display:none">
@@ -432,6 +318,124 @@
     </div>
   </div>
 </section>
+
+  <!-- Autopilot: the loop a clip tool doesn't close. Connect a feed once and
+       episodes clip and queue themselves with nobody at the keyboard. -->
+
+  <!-- The back catalogue: the part no one-file-at-a-time tool can reach. -->
+  <section class="cat-card" id="catCard" style="display:none">
+    <div class="auto-head">
+      <div>
+        <span class="eyebrow">Back catalogue</span>
+        <h2>Mine everything you've already said</h2>
+      </div>
+      <span class="auto-state" id="catStat"></span>
+    </div>
+
+    <p class="auto-blurb" id="catBlurb">
+      Every other tool starts from the file you upload today. This reads your whole
+      history, finds what your show keeps coming back to, and pulls the best
+      answers you've ever given — from across every episode.
+    </p>
+
+    <div class="cat-actions">
+      <button class="btn sm" id="catScan">Scan my back catalogue</button>
+      <button class="btn ghost sm" id="catThemes">Find my themes</button>
+    </div>
+    <div class="auto-err" id="catErr"></div>
+
+    <div class="cat-progress" id="catProgress" style="display:none">
+      <div class="cat-bar"><div class="cat-fill" id="catFill"></div></div>
+      <div class="cat-prog-txt" id="catProgTxt"></div>
+    </div>
+
+    <div class="cat-themes" id="catThemeList"></div>
+
+    <div class="cat-search">
+      <input id="catQuery" type="text" placeholder="Or search it yourself — “burnout”, “pricing”, “how they started”…">
+      <button class="btn sm" id="catGo">Find the best moments</button>
+      <button class="btn ghost sm" id="catMakeAll" style="display:none"></button>
+    </div>
+
+    <div class="cat-results" id="catResults"></div>
+  </section>
+
+  <section class="auto-card" id="autoCard" style="display:none">
+    <div class="auto-head">
+      <div>
+        <span class="eyebrow">Autopilot</span>
+        <h2 id="autoTitle">Let your episodes clip themselves</h2>
+      </div>
+      <span class="auto-state" id="autoState"></span>
+    </div>
+
+    <!-- not connected yet -->
+    <div id="autoSetup">
+      <p class="auto-blurb">
+        Connect your show's RSS feed. Every new episode gets clipped and queued
+        to post automatically — you don't have to open this page again.
+      </p>
+      <form class="auto-form" id="autoForm">
+        <input type="url" id="autoFeed" placeholder="https://feeds.example.com/your-show" required>
+        <button class="btn" type="submit">Connect feed</button>
+      </form>
+      <div class="auto-err" id="autoErr"></div>
+    </div>
+
+    <!-- connected -->
+    <div id="autoLive" style="display:none">
+      <div class="auto-show">
+        <img id="autoArt" alt="" width="56" height="56">
+        <div>
+          <div class="auto-name" id="autoShow"></div>
+          <div class="auto-sub" id="autoLast"></div>
+        </div>
+      </div>
+
+      <div class="auto-settings">
+        <div class="set-field">
+          <label for="autoClips">Clips per episode</label>
+          <select id="autoClips" class="voice-select"></select>
+        </div>
+        <div class="set-field">
+          <label for="autoLength">Clip length</label>
+          <select id="autoLength" class="voice-select">
+            <option value="auto">Auto — varied</option>
+            <option value="short">Short (15–30s)</option>
+            <option value="medium">Medium (30–45s)</option>
+            <option value="long">Long (45–60s)</option>
+          </select>
+        </div>
+        <div class="set-field">
+          <label for="autoHour">Post at</label>
+          <select id="autoHour" class="voice-select"></select>
+        </div>
+      </div>
+
+      <label class="switch" id="autoPostSwitch">
+        <input type="checkbox" id="autoPost">
+        <span class="track"></span>
+        <span class="switch-label">📅 Queue the clips to post, one a day</span>
+      </label>
+
+      <div class="auto-plats" id="autoPlats">
+        <label><input type="checkbox" value="tiktok"> TikTok</label>
+        <label><input type="checkbox" value="instagram"> Instagram</label>
+        <label><input type="checkbox" value="youtube"> YouTube</label>
+      </div>
+
+      <div class="auto-actions">
+        <button class="btn sm" id="autoSave">Save</button>
+        <button class="btn ghost sm" id="autoCheck">Check now</button>
+        <button class="btn ghost sm" id="autoPause"></button>
+        <button class="btn ghost sm danger" id="autoDrop">Disconnect</button>
+      </div>
+      <div class="auto-err" id="autoErr2"></div>
+
+      <div class="auto-log" id="autoLog"></div>
+    </div>
+  </section>
+
 </main>
 
 <script src="/bg.js"></script>

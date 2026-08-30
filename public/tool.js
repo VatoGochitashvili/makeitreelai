@@ -164,14 +164,7 @@ async function resumeRunningJob() {
     if (!jobs || !jobs.length) return;
     const j = jobs[0];
     currentJobId = j.id;
-    if (ME && ME.user && !ME.ownershipAck) {
-    if (!(await confirmOwnership())) {
-      toolHint("We need that confirmation before we can start.");
-      return;
-    }
-  }
-
-  panel.classList.add("show");
+    panel.classList.add("show");
     $("errBox").style.display = "none";
     $("progWrap").style.display = "block";
     $("stopBtn").style.display = "inline-block";
@@ -925,6 +918,14 @@ async function start(fromUpload) {
     localStorage.setItem("mir_pendingSettings", JSON.stringify(currentSettings()));
     location.href = "/register.html";
     return;
+  }
+
+  // Asked once, when someone first tries to generate.
+  if (ME && ME.user && !ME.ownershipAck) {
+    if (!(await confirmOwnership())) {
+      toolHint("We need that confirmation before we can start.");
+      return;
+    }
   }
 
   clipsEl.innerHTML = ""; logEl.textContent = ""; panel.classList.add("show");
