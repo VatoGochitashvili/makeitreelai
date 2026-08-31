@@ -13,6 +13,7 @@ import { planOf, VOICE_IDS, fmtHours, CREDIT_PACKS } from "./src/plans.js";
 import { creditsFor, economics } from "./src/credits.js";
 import { DATA_DIR, readJSON, writeJSON } from "./src/store.js";
 import { fetchPodcastFeed, normalizeUrl, isDirectMedia } from "./src/sources.js";
+import { assertPublicUrl } from "./src/safe-url.js";
 import { workerRouter, workerEnabled, requestDownload, workerOnline } from "./src/worker-queue.js";
 import { backgroundsRouter, loadBackgrounds, findBackground, anyBackground, backgroundsFor } from "./src/backgrounds.js";
 import { autopilotRouter, initAutopilot } from "./src/autopilot.js";
@@ -232,6 +233,14 @@ app.post("/api/clip", async (req, res) => {
   }
   if (!process.env.OPENAI_API_KEY) {
     return res.status(500).json({ error: "Server is missing OPENAI_API_KEY. Add it to your .env file." });
+  }
+
+  // Check where the link points before doing anything else — otherwise a
+  // private-network URL still creates a job, takes a queue slot and fails a
+  // minute later with a stage-specific error nobody can act on.
+  if (cleanUrl && !sourceFile) {
+    try { await assertPublicUrl(cleanUrl); }
+    catch (e) { return res.status(400).json({ error: e.message }); }
   }
 
   // Confirmed once, per account. The site says we check; this is the check.
@@ -520,6 +529,8 @@ checkYtdlpAge().then((r) => {
 app.get("/api/preview", async (req, res) => {
   const url = String(req.query.url || "");
   if (!/^https?:\/\//.test(url)) return res.status(400).json({ error: "Invalid URL." });
+  try { await assertPublicUrl(url); }
+  catch (e) { return res.status(400).json({ error: e.message }); }
 
   if (previewCache.has(url)) return res.json(previewCache.get(url));
 
@@ -701,6 +712,19 @@ const server = app.listen(PORT, () => {
 });
 
 // Shut down cleanly and say so, and make sure closing the terminal
+// Anything that throws past a route lands here. Without it Express replies with
+// a stack trace, which tells an attacker the file layout and tells a customer
+// nothing they can act on.
+app.use((err, req, res, _next) => {
+  const ref = Math.random().toString(36).slice(2, 8).toUpperCase();
+  console.error(`[MIR-${ref}] ${req.method} ${req.path}:`, err.stack || err);
+  if (res.headersSent) return;
+  res.status(500).json({
+    error: "Something broke on our side. Quote this if you get in touch.",
+    errorCode: `MIR-${ref}`,
+  });
+});
+
 // (SIGHUP) takes the server with it rather than leaving it orphaned.
 let stopping = false;
 function shutdown(signal) {
@@ -730,3 +754,15 @@ function shutdown(signal) {
   }, 3000).unref();
 }
 for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, () => shutdown(sig));
+
+// One stray rejection anywhere used to take the whole server down, and on a
+// single box that is every customer's session, every running job and the
+// autopilot with it. Log it and keep serving; a degraded server beats none.
+process.on("unhandledRejection", (reason) => {
+  console.error("⚠ unhandled rejection:", reason instanceof Error ? reason.stack : reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("⚠ uncaught exception:", err.stack || err);
+  // Deliberately not exiting: the jobs in flight and their temp files are worth
+  // more than a clean slate. If this fires often, that is the bug to fix.
+});

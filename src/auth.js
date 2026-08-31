@@ -79,13 +79,18 @@ function parseCookies(req) {
   }
   return out;
 }
+// Secure in production, so the session cookie is never sent over plain HTTP.
+// Left off in development because localhost has no TLS and the flag would stop
+// logins working entirely.
+const SECURE = process.env.NODE_ENV === "production" ? "; Secure" : "";
+
 function setSession(res, userId) {
   const token = sign(userId);
   res.setHeader("Set-Cookie",
-    `${COOKIE}=${encodeURIComponent(token)}; HttpOnly; Path=/; Max-Age=${MAX_AGE}; SameSite=Lax`);
+    `${COOKIE}=${encodeURIComponent(token)}; HttpOnly; Path=/; Max-Age=${MAX_AGE}; SameSite=Lax${SECURE}`);
 }
 function clearSession(res) {
-  res.setHeader("Set-Cookie", `${COOKIE}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`);
+  res.setHeader("Set-Cookie", `${COOKIE}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${SECURE}`);
 }
 
 // Look up the signed-in user for a request (or null).
@@ -261,14 +266,42 @@ authRouter.post("/register", (req, res) => {
   res.status(201).json({ user: publicUser(user) });
 });
 
+// Password guessing was unlimited and free. Counted per email and per IP, so
+// neither a targeted account nor a spray across many can be brute-forced, and
+// the window is short enough that a real person who mistypes twice is fine.
+const ATTEMPTS = new Map();   // key -> { n, until }
+const MAX_ATTEMPTS = 8, LOCK_MS = 15 * 60 * 1000;
+
+function attemptKey(req, email) { return `${req.ip}|${email}`; }
+function tooManyAttempts(key) {
+  const a = ATTEMPTS.get(key);
+  if (!a) return 0;
+  if (Date.now() > a.until) { ATTEMPTS.delete(key); return 0; }
+  return a.n >= MAX_ATTEMPTS ? Math.ceil((a.until - Date.now()) / 60000) : 0;
+}
+function noteAttempt(key) {
+  const a = ATTEMPTS.get(key) || { n: 0, until: 0 };
+  a.n += 1;
+  a.until = Date.now() + LOCK_MS;
+  ATTEMPTS.set(key, a);
+  if (ATTEMPTS.size > 5000) for (const [k, v] of ATTEMPTS) if (Date.now() > v.until) ATTEMPTS.delete(k);
+}
+
 authRouter.post("/login", (req, res) => {
   let { email, password } = req.body || {};
   email = (email || "").trim().toLowerCase();
   const user = users.get(email);
   // Same message either way, so we don't reveal which emails exist.
+  const key = attemptKey(req, email);
+  const mins = tooManyAttempts(key);
+  if (mins) {
+    return res.status(429).json({ error: `Too many attempts. Try again in ${mins} minute${mins === 1 ? "" : "s"}.` });
+  }
   if (!user || !verifyPassword(password || "", user.salt, user.hash)) {
+    noteAttempt(key);
     return res.status(401).json({ error: "Wrong email or password." });
   }
+  ATTEMPTS.delete(key);
   setSession(res, user.id);
   res.json({ user: publicUser(user) });
 });

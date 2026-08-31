@@ -16,6 +16,7 @@ import { createReadStream, existsSync, createWriteStream } from "node:fs";
 import { Readable } from "node:stream";
 import { pipeline as streamPipeline } from "node:stream/promises";
 import { normalizeUrl, isDirectMedia } from "./sources.js";
+import { assertPublicUrl } from "./safe-url.js";
 
 // Lazily create the OpenAI client. Constructing it at import time throws when
 // OPENAI_API_KEY is unset, which would crash the whole server on boot — so we
@@ -203,6 +204,8 @@ export function hasVideoStream(file) {
 // Fetch a plain media URL (podcast episode, Drive/Dropbox share, public mp4).
 // These are meant to be downloaded, so no extractor and no bot-blocking.
 async function downloadDirect(url, workDir, log) {
+  // Never fetch a user-supplied URL without checking where it points.
+  await assertPublicUrl(url);
   log("Downloading media…");
   const res = await fetch(url, {
     redirect: "follow",

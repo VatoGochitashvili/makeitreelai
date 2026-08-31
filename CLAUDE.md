@@ -202,6 +202,20 @@ anyone who opens devtools.
 The webhook route is mounted **before** `express.json()` because Stripe signs
 the raw bytes.
 
+## Fetching user-supplied URLs
+`assertPublicUrl()` in `src/safe-url.js` must guard every path that fetches a
+URL a user gave us: direct media, podcast feeds, and the previewer. It resolves
+the host and refuses loopback, private, link-local and CGNAT ranges.
+
+Without it the server is a proxy onto its own network. Pasting
+`http://169.254.169.254/latest/meta-data/` had it fetch the cloud metadata
+service — which hands out instance credentials on most hosts — transcribe the
+response and hand it back as a clip. Verified before the fix.
+
+The check also runs at the route, not only in the pipeline, so a bad URL is
+refused immediately rather than after taking a queue slot and failing a minute
+later with an ffmpeg error.
+
 ## Legal pages
 `public/privacy.html` and `public/terms.html`, linked from every footer and
 from the signup form. Stripe will not process live payments without both, and

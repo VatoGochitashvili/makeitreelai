@@ -1,3 +1,5 @@
+import { assertPublicUrl } from "./safe-url.js";
+
 // Alternative, non-blockable video/audio sources.
 //
 // The point: every source here either hands us a file the user owns, or a
@@ -59,6 +61,8 @@ function parseDuration(v) {
 }
 
 export async function fetchPodcastFeed(feedUrl, limit = 60) {
+  // Feeds are user-supplied too, and autopilot re-fetches them on a timer.
+  await assertPublicUrl(feedUrl);
   const res = await fetch(feedUrl, {
     headers: { "User-Agent": "MakeItReel/1.0 (podcast feed reader)" },
     signal: AbortSignal.timeout(15000),
